@@ -4,9 +4,9 @@ import dotenv from "dotenv";
 dotenv.config();
 
 /**
- * Script para inicialización de la base de datos con sus tablas necesarias. 
- * Se ejecuta al iniciar el servidor, pero solo crea lo que no existe, no borra ni modifica nada.
- **/ 
+ * Script para inicialización de la base de datos con sus tablas necesarias.
+ * Crea la BD, tablas e índices si no existen.
+ */
 
 async function init() {
   const conn = await r.connect({
@@ -20,11 +20,12 @@ async function init() {
   const dbList = await r.dbList().run(conn);
   if (!dbList.includes(dbName)) {
     await r.dbCreate(dbName).run(conn);
-    console.log(`Base de datos creada: ${dbName}`);
+    console.log(`✔ Base de datos creada: ${dbName}`);
   } else {
-    console.log(`Base de datos ya existe: ${dbName}`);
+    console.log(`✔ Base de datos ya existe: ${dbName}`);
   }
 
+  // Crear tablas si no existen
   const tables = ["users", "messages", "private_messages", "alerts"];
 
   for (const table of tables) {
@@ -35,6 +36,19 @@ async function init() {
       console.log(`Tabla creada: ${table}`);
     } else {
       console.log(`Tabla ya existe: ${table}`);
+    }
+
+    // Crear índices necesarios
+    if (table === "messages") {
+      const indexes = await r.db(dbName).table("messages").indexList().run(conn);
+
+      if (!indexes.includes("createdAt")) {
+        await r.db(dbName).table("messages").indexCreate("createdAt").run(conn);
+        await r.db(dbName).table("messages").indexWait("createdAt").run(conn);
+        console.log("Índice creado: createdAt");
+      } else {
+        console.log("Índice 'createdAt' ya existe");
+      }
     }
   }
 
