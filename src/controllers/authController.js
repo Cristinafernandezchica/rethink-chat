@@ -21,7 +21,7 @@ export const register = async (req, res) => {
       port: process.env.RETHINK_PORT
     });
 
-    // Comprobar si el usuario ya existe, lanzar error si es así
+    // Comprobar si el usuario ya existe
     const existing = await r.db(db).table("users")
       .filter({ username })
       .run(conn);
@@ -33,10 +33,11 @@ export const register = async (req, res) => {
     // Hash de contraseña
     const hashed = await bcrypt.hash(password, 10);
 
-    // Insertar usuario en la tabla users
-    const result = await r.db(db).table("users").insert({
+    // Insertar usuario con role
+    await r.db(db).table("users").insert({
       username,
       password: hashed,
+      role: "user",
       createdAt: new Date()
     }).run(conn);
 
@@ -63,39 +64,43 @@ export const login = async (req, res) => {
       port: process.env.RETHINK_PORT
     });
 
-    // Buscar usuario en tabla users
+    // Buscar usuario en tabla users (incluyendo role)
     const cursor = await r.db(db).table("users")
       .filter({ username })
+      .pluck("id", "username", "password", "role")
       .run(conn);
 
-    // Si el usuario no existe, se lanza mensaje de error
     const users = await cursor.toArray();
     if (users.length === 0)
       return res.status(400).json({ error: "Usuario no encontrado" });
 
     const user = users[0];
 
-    // Si la contraseña es incorrecta, se lanza mensaje de error
+    // Validar contraseña
     const valid = await bcrypt.compare(password, user.password);
     if (!valid)
       return res.status(400).json({ error: "Contraseña incorrecta" });
 
-    // Token JWT
+    // Token JWT con role incluido
     const token = jwt.sign(
-      { id: user.id, username: user.username },
+      { 
+        id: user.id, 
+        username: user.username,
+        role: user.role 
+      },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
     conn.close();
 
-    // Aquí devolvermos el token, junto con el id de usuario que se genera y el username, quizás lo dejo en el token únicamente
     return res.json({
       message: "Login correcto",
       token,
       user: {
         id: user.id,
-        username: user.username
+        username: user.username,
+        role: user.role
       }
     });
 

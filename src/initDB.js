@@ -26,11 +26,11 @@ async function init() {
   }
 
   // Crear tablas si no existen
-  const tables = ["users", "messages", "private_messages", "alerts"];
+  const tables = ["users", "messages", "private_messages", "alerts", "online_users"];
+
+  const tableList = await r.db(dbName).tableList().run(conn);
 
   for (const table of tables) {
-    const tableList = await r.db(dbName).tableList().run(conn);
-
     if (!tableList.includes(table)) {
       await r.db(dbName).tableCreate(table).run(conn);
       console.log(`Tabla creada: ${table}`);
@@ -48,6 +48,24 @@ async function init() {
         console.log("Índice creado: createdAt");
       } else {
         console.log("Índice 'createdAt' ya existe");
+      }
+    }
+
+    if (table === "users") {
+      const indexes = await r.db(dbName).table("users").indexList().run(conn);
+      if (!indexes.includes("username")) {
+        await r.db(dbName).table("users").indexCreate("username").run(conn);
+        await r.db(dbName).table("users").indexWait("username").run(conn);
+        console.log("Índice creado: username");
+      }
+    }
+
+    if (table === "online_users") {
+      const indexes = await r.db(dbName).table("online_users").indexList().run(conn);
+      if (!indexes.includes("username")) {
+        await r.db(dbName).table("online_users").indexCreate("username").run(conn);
+        await r.db(dbName).table("online_users").indexWait("username").run(conn);
+        console.log("Índice creado: username");
       }
     }
   }

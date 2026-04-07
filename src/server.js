@@ -4,6 +4,8 @@ import { Server } from "socket.io";
 import cors from "cors";
 import { connectDB } from "./db.js";
 import { registerSocketHandlers } from "./sockets.js";
+import authRoutes from "./routes/auth.js";
+
 
 const app = express();
 
@@ -12,7 +14,6 @@ app.use(cors());
 app.use(express.json());
 
 // Carga las rutas de la API
-import authRoutes from "./routes/auth.js";
 app.use("/api/auth", authRoutes);
 
 // Servidor HTTP + WebSockets

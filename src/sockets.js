@@ -1,4 +1,5 @@
 import r from "rethinkdb";
+import { verifyToken } from "./auth.js";
 
 export function registerSocketHandlers(io, conn) {
   const db = process.env.RETHINK_DB;
@@ -6,10 +7,34 @@ export function registerSocketHandlers(io, conn) {
   io.on("connection", async (socket) => {
     console.log("Usuario conectado:", socket.id);
 
-    // IDENTIFICACIÓN DEL USUARIO
-    socket.on("identify", (username) => {
-      socket.username = username;
-      console.log(`Usuario identificado: ${username} (socket ${socket.id})`);
+    // IDENTIFICACIÓN DEL USUARIO (Ahora con JWT)
+    socket.on("identify", async (token) => {
+      try {
+        const payload = verifyToken(token);
+
+        socket.username = payload.username;
+        socket.role = payload.role;
+
+        console.log(`Usuario identificado: ${payload.username} (socket ${socket.id})`);
+
+        // Insertar en online_users
+        await r.db(db).table("online_users").insert({
+          username: payload.username,
+          socketId: socket.id,
+          role: payload.role,
+          connectedAt: new Date()
+        }).run(conn);
+
+        // Enviar lista actual de usuarios online solo a este socket
+        const cursor = await r.db(db).table("online_users").run(conn);
+        const online = await cursor.toArray();
+        socket.emit("online_users", online);
+
+      } catch (err) {
+        console.error("Token inválido:", err.message);
+        socket.emit("auth_error", { message: "Token inválido" });
+        socket.disconnect();
+      }
     });
 
     // HISTORIAL DEL CHAT GENERAL
@@ -43,8 +68,6 @@ export function registerSocketHandlers(io, conn) {
 
       await r.db(db).table("private_messages").insert(message).run(conn);
 
-      // Buscar al usuario destino por username
-      // En este caso no se está usando changefeeds, si no que se emite directamente al usuario destino (si está conectado) y al emisor.
       const targetSocket = [...io.sockets.sockets.values()]
         .find(s => s.username === data.to);
 
@@ -52,38 +75,37 @@ export function registerSocketHandlers(io, conn) {
         targetSocket.emit("private_message", message);
       }
 
-      // Enviar copia al emisor
       socket.emit("private_message", message);
     });
 
-    
     // ALERTAS EN TIEMPO REAL
     socket.on("send_alert", async (data) => {
       const alert = {
         type: data.type || "info",
         text: data.text,
-        to: data.to || null,   // null = alerta global
+        to: data.to || null,
         createdAt: new Date()
       };
 
-      // Guardar en la BD
       await r.db(db).table("alerts").insert(alert).run(conn);
-
-      // No emitimos aquí porque el changefeed se encarga 
-
-
+      // No emitimos aquí porque el changefeed se encarga
     });
 
     // DESCONEXIÓN
-    socket.on("disconnect", () => {
+    socket.on("disconnect", async () => {
       console.log("Usuario desconectado:", socket.id);
+
+      if (socket.username) {
+        await r.db(db).table("online_users")
+          .getAll(socket.username, { index: "username" })
+          .filter({ socketId: socket.id })
+          .delete()
+          .run(conn);
+      }
     });
   });
 
   // CHANGEFEED DEL CHAT GENERAL
-  // Cuando se detecta un nuevo mensaje, se emite a todos los clientes conectados: 
-  // RethinkDB permite escuchar cambios en tiempo real en una tabla mediante changefeeds. 
-  // Aquí se establece un changefeed en la tabla "messages" para detectar nuevos mensajes y emitirlos a los clientes.
   r.db(db).table("messages").changes().run(conn, (err, cursor) => {
     if (err) return console.error(err);
 
@@ -115,4 +137,16 @@ export function registerSocketHandlers(io, conn) {
     });
   });
 
+  // CHANGEFEED DE USUARIOS ONLINE
+  r.db(db).table("online_users").changes().run(conn, (err, cursor) => {
+    if (err) return console.error(err);
+
+    cursor.each((err, change) => {
+      if (change.new_val && !change.old_val) {
+        io.emit("user_online", change.new_val);
+      } else if (!change.new_val && change.old_val) {
+        io.emit("user_offline", change.old_val);
+      }
+    });
+  });
 }
