@@ -6,10 +6,12 @@ import { connectDB } from "./db.js";
 import { registerSocketHandlers } from "./sockets.js";
 
 const app = express();
+
+// Activar CORS y JSON
 app.use(cors());
 app.use(express.json());
 
-// Rutas API (login, registro…)
+// Carga las rutas de la API
 import authRoutes from "./routes/auth.js";
 app.use("/api/auth", authRoutes);
 
@@ -24,6 +26,6 @@ connectDB().then((conn) => {
   registerSocketHandlers(io, conn);
 
   server.listen(3000, () => {
-    console.log("🚀 Servidor escuchando en http://localhost:3000");
+    console.log("Servidor escuchando en http://localhost:3000");
   });
 });
