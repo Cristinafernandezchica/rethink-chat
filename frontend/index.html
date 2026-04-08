@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>RethinkChat - Mensajería moderna</title>
+
+  <!-- TailwindCSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Socket.io -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <style>
+    * {
+      scrollbar-width: thin;
+    }
+    
+    /* Custom scrollbar */
+    .messages-container::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .messages-container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .messages-container::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 10px;
+    }
+    
+    /* Animaciones */
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .message-animation {
+      animation: slideIn 0.2s ease-out;
+    }
+    
+    /* Efecto hover en conversaciones */
+    .conversation-item:hover {
+      background-color: #f1f5f9;
+      transform: translateX(2px);
+      transition: all 0.2s;
+    }
+    
+    /* Online indicator pulse */
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      50% {
+        transform: scale(1.2);
+        opacity: 0.7;
+      }
+    }
+    
+    .online-pulse {
+      animation: pulse 1.5s infinite;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 to-slate-800">
+
+  <!-- AUTH SCREEN -->
+  <div id="auth-screen" class="flex items-center justify-center h-screen p-4">
+    <div class="bg-white/95 backdrop-blur-sm shadow-2xl rounded-2xl p-8 w-full max-w-md transform transition-all">
+      
+      <div class="text-center mb-8">
+        <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+          <i class="fas fa-comments text-white text-3xl"></i>
+        </div>
+        <h2 id="auth-title" class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">Bienvenido</h2>
+        <p class="text-gray-500 mt-2">Conéctate y empieza a chatear</p>
+      </div>
+
+      <div class="space-y-4">
+        <div class="relative">
+          <i class="fas fa-user absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+          <input id="auth-username" class="w-full p-3 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" placeholder="Nombre de usuario">
+        </div>
+        <div class="relative">
+          <i class="fas fa-lock absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+          <input id="auth-password" type="password" class="w-full p-3 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" placeholder="Contraseña">
+        </div>
+      </div>
+
+      <p id="auth-error" class="text-red-500 text-center mt-3 text-sm"></p>
+
+      <button id="auth-btn" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-xl mt-6 hover:from-blue-600 hover:to-blue-700 transition transform hover:scale-[1.02] font-semibold shadow-lg">
+        <i class="fas fa-sign-in-alt mr-2"></i>
+        <span>Entrar</span>
+      </button>
+
+      <p class="text-center mt-6 text-sm text-gray-600">
+        <span id="toggle-auth" class="text-blue-600 cursor-pointer hover:underline font-medium">
+          ¿No tienes cuenta? Regístrate
+        </span>
+      </p>
+    </div>
+  </div>
+
+  <!-- APP SCREEN - Diseño tipo WhatsApp/Telegram -->
+  <div id="app-screen" class="hidden h-screen">
+    <div class="flex h-full bg-white shadow-2xl">
+      
+      <!-- SIDEBAR IZQUIERDO - Conversaciones -->
+      <div class="w-96 bg-gray-50 border-r flex flex-col">
+        <!-- Header del sidebar -->
+        <div class="bg-white p-4 border-b shadow-sm">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-md">
+                <i class="fas fa-user text-white text-lg"></i>
+              </div>
+              <div>
+                <p class="font-semibold text-gray-800" id="user-display">Usuario</p>
+                <p class="text-xs text-green-500">● Conectado</p>
+              </div>
+            </div>
+            <button id="logout-btn" class="text-red-500 hover:text-red-600 transition p-2 rounded-full hover:bg-red-50">
+              <i class="fas fa-sign-out-alt text-xl"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Búsqueda -->
+        <div class="p-3 bg-white border-b">
+          <div class="relative">
+            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+            <input id="search-users" type="text" placeholder="Buscar conversaciones..." class="w-full pl-9 pr-3 py-2 bg-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          </div>
+        </div>
+
+        <!-- Lista de conversaciones -->
+        <div class="flex-1 overflow-y-auto">
+          <ul id="conversation-list" class="divide-y divide-gray-200"></ul>
+        </div>
+      </div>
+
+      <!-- CHAT CENTRAL -->
+      <div class="flex-1 flex flex-col bg-gray-100">
+        <!-- Chat Header -->
+        <div class="bg-white p-4 border-b shadow-sm flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center shadow-md">
+              <i class="fas fa-comment text-white"></i>
+            </div>
+            <div>
+              <h1 id="chat-title" class="font-semibold text-gray-800 text-lg">Chat general</h1>
+              <p id="chat-status" class="text-xs text-gray-500">Grupo público</p>
+            </div>
+          </div>
+          <div class="flex space-x-2">
+            <button id="info-chat" class="p-2 rounded-full hover:bg-gray-100 transition">
+              <i class="fas fa-info-circle text-gray-600"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Mensajes -->
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 messages-container bg-[url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%239C92AC" fill-opacity="0.05"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]">
+        </div>
+
+        <!-- Input de mensaje -->
+        <div class="bg-white p-4 border-t shadow-lg">
+          <div class="flex items-end space-x-2">
+            <div class="flex-1 relative">
+              <textarea id="chat-input" rows="1" placeholder="Escribe un mensaje..." class="w-full p-3 pr-12 border border-gray-300 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent max-h-32"></textarea>
+              <button id="emoji-btn" class="absolute right-3 bottom-3 text-gray-400 hover:text-gray-600">
+                <i class="far fa-smile-wink text-xl"></i>
+              </button>
+            </div>
+            <button id="chat-send" class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 rounded-full hover:from-blue-600 hover:to-blue-700 transition shadow-md w-12 h-12 flex items-center justify-center">
+              <i class="fas fa-paper-plane"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SIDEBAR DERECHO - Usuarios y Alertas -->
+      <div class="w-80 bg-white border-l flex flex-col">
+        <!-- Usuarios Online -->
+        <div class="p-4 border-b bg-gradient-to-r from-gray-50 to-white">
+          <h3 class="font-semibold text-gray-800 flex items-center">
+            <i class="fas fa-users text-blue-500 mr-2"></i>
+            Usuarios
+            <span id="online-count" class="ml-2 text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">0</span>
+          </h3>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto">
+          <div class="p-3">
+            <p class="text-xs text-gray-500 mb-2 font-semibold uppercase tracking-wider">Todos los usuarios</p>
+            <ul id="users-list" class="space-y-2"></ul>
+          </div>
+        </div>
+
+        <!-- Alertas -->
+        <div class="border-t bg-gray-50">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h3 class="font-semibold text-gray-800 flex items-center">
+              <i class="fas fa-bell text-yellow-500 mr-2"></i>
+              Alertas
+            </h3>
+            <button id="test-alert" class="bg-yellow-500 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-yellow-600 transition shadow-sm">
+              <i class="fas fa-plus mr-1"></i> Probar
+            </button>
+          </div>
+          <ul id="alerts" class="h-48 overflow-y-auto p-3 space-y-2"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

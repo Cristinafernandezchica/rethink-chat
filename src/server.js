@@ -5,7 +5,7 @@ import cors from "cors";
 import { connectDB } from "./db.js";
 import { registerSocketHandlers } from "./sockets.js";
 import authRoutes from "./routes/auth.js";
-
+import messagesRoutes from "./routes/messages.js";
 
 const app = express();
 
@@ -15,6 +15,7 @@ app.use(express.json());
 
 // Carga las rutas de la API
 app.use("/api/auth", authRoutes);
+app.use("/api/messages", messagesRoutes);
 
 // Servidor HTTP + WebSockets
 const server = http.createServer(app);
@@ -24,6 +25,10 @@ const io = new Server(server, {
 
 // Conectar DB y arrancar sockets
 connectDB().then((conn) => {
+
+  app.set("dbConn", conn);
+
+  // Sockets sí reciben la conexión
   registerSocketHandlers(io, conn);
 
   server.listen(3000, () => {

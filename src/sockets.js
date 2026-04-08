@@ -25,10 +25,47 @@ export function registerSocketHandlers(io, conn) {
           connectedAt: new Date()
         }).run(conn);
 
-        // Enviar lista actual de usuarios online solo a este socket
+        // Enviar lista actual de usuarios online
         const cursor = await r.db(db).table("online_users").run(conn);
         const online = await cursor.toArray();
         socket.emit("online_users", online);
+
+        // Cargar historial de mensajes privados
+        const privateMessagesCursor = await r.db(db).table("private_messages")
+          .filter(
+            r.row("from").eq(payload.username).or(r.row("to").eq(payload.username))
+          )
+          .orderBy("createdAt")
+          .run(conn);
+
+        const allPrivateMessages = await privateMessagesCursor.toArray();
+        
+        // Agrupar mensajes por conversación
+        const conversationsMap = new Map();
+        
+        allPrivateMessages.forEach(msg => {
+          const otherUser = msg.from === payload.username ? msg.to : msg.from;
+          
+          if (!conversationsMap.has(otherUser)) {
+            conversationsMap.set(otherUser, []);
+          }
+          
+          conversationsMap.get(otherUser).push({
+            from: msg.from,
+            to: msg.to,
+            text: msg.text,
+            createdAt: msg.createdAt
+          });
+        });
+        
+        // Convertir a array para enviar
+        const conversations = Array.from(conversationsMap.entries()).map(([otherUser, messages]) => ({
+          otherUser,
+          messages
+        }));
+        
+        // Enviar historial privado al cliente
+        socket.emit("private_history", conversations);
 
       } catch (err) {
         console.error("Token inválido:", err.message);
@@ -36,6 +73,7 @@ export function registerSocketHandlers(io, conn) {
         socket.disconnect();
       }
     });
+
 
     // HISTORIAL DEL CHAT GENERAL
     const cursor = await r.db(db).table("messages")
@@ -66,16 +104,8 @@ export function registerSocketHandlers(io, conn) {
         createdAt: new Date()
       };
 
+      // Solo guardar en BD, el changefeed se encargará de emitir
       await r.db(db).table("private_messages").insert(message).run(conn);
-
-      const targetSocket = [...io.sockets.sockets.values()]
-        .find(s => s.username === data.to);
-
-      if (targetSocket) {
-        targetSocket.emit("private_message", message);
-      }
-
-      socket.emit("private_message", message);
     });
 
     // ALERTAS EN TIEMPO REAL
@@ -97,10 +127,9 @@ export function registerSocketHandlers(io, conn) {
 
       if (socket.username) {
         await r.db(db).table("online_users")
-          .getAll(socket.username, { index: "username" })
-          .filter({ socketId: socket.id })
-          .delete()
-          .run(conn);
+        .filter({ socketId: socket.id })
+        .delete()
+        .run(conn);
       }
     });
   });
@@ -149,4 +178,30 @@ export function registerSocketHandlers(io, conn) {
       }
     });
   });
+
+  // CHANGEFEED DE MENSAJES PRIVADOS
+  r.db(db).table("private_messages").changes().run(conn, (err, cursor) => {
+  if (err) return console.error("Error en changefeed private_messages:", err);
+
+  cursor.each((err, change) => {
+    if (err) {
+      console.error("Error en cambio de private_messages:", err);
+      return;
+    }
+    
+    if (change.new_val) {
+      const message = change.new_val;
+      
+      // Emitir solo a los involucrados en la conversación
+      const sockets = [...io.sockets.sockets.values()];
+      
+      sockets.forEach(socket => {
+        if (socket.username === message.from || socket.username === message.to) {
+          socket.emit("private_message", message);
+        }
+      });
+    }
+  });
+});
+
 }
