@@ -31,6 +31,15 @@ connectDB().then((conn) => {
   // Sockets sí reciben la conexión
   registerSocketHandlers(io, conn);
 
+  // Endpoint de salud para Railway
+  app.get('/api/health', (req, res) => {
+    res.status(200).json({ 
+      status: 'OK', 
+      timestamp: new Date(),
+      uptime: process.uptime()
+    });
+  });
+
   server.listen(3000, () => {
     console.log("Servidor escuchando en http://localhost:3000");
   });

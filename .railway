@@ -1,0 +1,5 @@
+[environments.production]
+RETHINK_HOST = "rethinkdb"
+RETHINK_PORT = "28015"
+RETHINK_DB = "rethinkchat"
+JWT_SECRET = "generar-un-secreto-seguro-aqui"
