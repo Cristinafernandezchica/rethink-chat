@@ -55,6 +55,7 @@ window.addEventListener("DOMContentLoaded", () => {
         } else {
           localStorage.setItem("token", data.token);
           localStorage.setItem("username", data.user.username);
+          localStorage.setItem("role", data.user.role);
 
           document.getElementById("auth-screen").classList.add("hidden");
           document.getElementById("app-screen").classList.remove("hidden");
@@ -98,29 +99,35 @@ function initSocket() {
   socket.on("connect", async () => {
     socket.emit("identify", token);
 
+    // Mostrar panel admin si es admin
+    if (localStorage.getItem("role") === "admin") {
+      const adminPanel = document.getElementById("admin-panel");
+      if (adminPanel) adminPanel.classList.remove("hidden");
+    }
+
     // Cargar todos los usuarios (online y offline)
     try {
       const { ok, data } = await window.api.getAllUsers(token);
-        if (ok) {
+      if (ok) {
         const users = Array.isArray(data)
-            ? data
-            : Array.isArray(data.users)
-            ? data.users
-            : [];
+          ? data
+          : Array.isArray(data.users)
+          ? data.users
+          : [];
 
         window.uiState.allUsers = users;
 
         users.forEach(u => {
-            if (u.username === username) return;
-            ensureConversation(u.username);
-            if (!window.uiState.users.has(u.username)) {
+          if (u.username === username) return;
+          ensureConversation(u.username);
+          if (!window.uiState.users.has(u.username)) {
             window.uiState.users.set(u.username, { online: false });
-            }
+          }
         });
 
         window.ui.renderUsersList();
         window.ui.renderConversationList();
-        }
+      }
     } catch (e) {
       console.error("Error cargando todos los usuarios:", e);
     }
@@ -154,24 +161,22 @@ function initSocket() {
 
     // Marcar todos como offline
     window.uiState.allUsers.forEach(u => {
-        if (u.username !== currentUser) {
+      if (u.username !== currentUser) {
         window.uiState.users.set(u.username, { online: false });
-        }
+      }
     });
 
     // Marcar como online los que vienen en la lista
     users.forEach(u => {
-        if (u.username !== currentUser) {
+      if (u.username !== currentUser) {
         window.uiState.users.set(u.username, { online: true });
-        }
-        ensureConversation(u.username);
+      }
+      ensureConversation(u.username);
     });
 
     window.ui.renderUsersList();
     window.ui.renderConversationList();
-});
-
-
+  });
 
   // Usuario entra
   socket.on("user_online", (user) => {
@@ -226,7 +231,7 @@ function initSocket() {
     }
   });
 
-  // Historial privados vía socket (si también lo envías así)
+  // Historial privados vía socket
   socket.on("private_history", (convs) => {
     console.log("Recibido historial privado vía socket:", convs.length);
 
@@ -249,13 +254,17 @@ function initSocket() {
     }
   });
 
-  // Mensaje privado recibido (SOLO changefeed, sin push local previo)
+  // Mensaje privado recibido
   socket.on("private_message", (msg) => {
     const currentUser = localStorage.getItem("username");
     const other = msg.from === currentUser ? msg.to : msg.from;
 
     ensureConversation(other);
     window.conversations[other].push(msg);
+
+    if (!window.uiState.users.has(other)) {
+      window.uiState.users.set(other, { online: false, hasUnread: false });
+    }
 
     // Notificación si NO estás en ese chat
     if (window.currentChat !== other) {
@@ -265,7 +274,6 @@ function initSocket() {
         ephemeral: true
       });
 
-      // Resaltar conversación
       window.uiState.users.get(other).hasUnread = true;
     }
 
@@ -307,6 +315,7 @@ function initSocket() {
     }
   });
 
+  // Typing estilo WhatsApp
   let typingTimeout = null;
 
   document.getElementById("chat-input").addEventListener("input", () => {
@@ -332,12 +341,59 @@ function initSocket() {
     }
   });
 
-
-  // Probar alerta
+  // Probar alerta simple
   document.getElementById("test-alert").addEventListener("click", () => {
     socket.emit("send_alert", {
       type: "info",
-      text: "Esto es una alerta de prueba"
+      text: "Esto es una alerta de prueba",
+      ephemeral: true
     });
   });
+
+  // Panel de administración: abrir modal para alerta global persistente
+  const adminGlobalBtn = document.getElementById("admin-alert-global");
+  const adminEfimeraBtn = document.getElementById("admin-alert-efimera");
+  const alertModal = document.getElementById("alert-modal");
+  const alertText = document.getElementById("alert-text");
+  const alertCancel = document.getElementById("alert-cancel");
+  const alertConfirm = document.getElementById("alert-confirm");
+
+  if (adminGlobalBtn) {
+    adminGlobalBtn.addEventListener("click", () => {
+      alertModal.dataset.type = "global";
+      alertModal.classList.remove("hidden");
+    });
+  }
+
+  if (adminEfimeraBtn) {
+    adminEfimeraBtn.addEventListener("click", () => {
+      alertModal.dataset.type = "efimera";
+      alertModal.classList.remove("hidden");
+    });
+  }
+
+  if (alertCancel) {
+    alertCancel.addEventListener("click", () => {
+      alertModal.classList.add("hidden");
+      alertText.value = "";
+    });
+  }
+
+  if (alertConfirm) {
+    alertConfirm.addEventListener("click", () => {
+      const text = alertText.value.trim();
+      const type = alertModal.dataset.type;
+
+      if (!text) return;
+
+      if (type === "global") {
+        socket.emit("send_alert", { text, ephemeral: false });
+      } else {
+        socket.emit("send_alert", { text, ephemeral: true });
+      }
+
+      alertModal.classList.add("hidden");
+      alertText.value = "";
+    });
+  }
 }
