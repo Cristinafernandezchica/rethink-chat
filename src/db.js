@@ -8,18 +8,18 @@ let connection = null;
 export async function connectDB() {
   if (connection) return connection;
 
-  const host = process.env.RETHINK_HOST;
-  const port = process.env.RETHINK_PORT;
-  const db = process.env.RETHINK_DB;
+  const host = process.env.RAILWAY_TCP_PROXY_DOMAIN || process.env.RETHINK_HOST;
+  const port = process.env.RETHINK_PORT || "28015";
+  const db = process.env.RETHINK_DB || "rethinkchat";
 
-  // Log para ver qué valores está usando
   console.log("📡 Configuración de conexión:");
   console.log("   RETHINK_HOST:", host || "❌ NO DEFINIDO");
-  console.log("   RETHINK_PORT:", port || "❌ NO DEFINIDO");
-  console.log("   RETHINK_DB:", db || "❌ NO DEFINIDO");
+  console.log("   RETHINK_PORT:", port);
+  console.log("   RETHINK_DB:", db);
 
-  if (!host || !port || !db) {
-    throw new Error("Faltan variables de entorno. Configura RETHINK_HOST, RETHINK_PORT y RETHINK_DB en Railway");
+  if (!host) {
+    console.error("❌ No se pudo determinar el host de RethinkDB");
+    throw new Error("Host de RethinkDB no configurado");
   }
 
   try {
