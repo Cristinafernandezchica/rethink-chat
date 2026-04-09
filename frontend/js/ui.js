@@ -125,65 +125,61 @@ window.ui = {
 
   // Render lista de todos los usuarios
   renderUsersList: () => {
-    const container = document.getElementById("users-list");
-    if (!container) return;
-    
-    container.innerHTML = "";
+    const list = document.getElementById("users-list");
+    list.innerHTML = "";
+
     const currentUser = localStorage.getItem("username");
-    let onlineCount = 0;
-    
-    // Mostrar todos los usuarios registrados
-    window.uiState.allUsers.forEach(user => {
-      if (user.username === currentUser) return;
-      
-      const isOnline = window.uiState.users.get(user.username)?.online || false;
-      if (isOnline) onlineCount++;
-      
+
+    // window.uiState.allUsers viene de getAllUsers en app.js
+    window.uiState.allUsers.forEach(u => {
+      if (u.username === currentUser) return;
+
+      const username = u.username;
+      const userState = window.uiState.users.get(username) || { online: false, hasUnread: false };
+      const isOnline = userState.online;
+
       const li = document.createElement("li");
-      li.className = "flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition group";
-      
+      li.className =
+        "flex items-center justify-between px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100";
+
       li.innerHTML = `
-        <div class="flex items-center space-x-3 flex-1">
+        <div class="flex items-center space-x-3">
           <div class="relative">
-            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center">
+            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow">
               <i class="fas fa-user text-white text-sm"></i>
             </div>
-            ${isOnline ? '<div class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>' : ''}
+            ${
+              isOnline
+                ? '<span class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>'
+                : ""
+            }
           </div>
-          <div class="flex-1">
-            <p class="font-medium text-gray-800 text-sm">${escapeHtml(user.username)}</p>
-            <p class="text-xs ${isOnline ? 'text-green-500' : 'text-gray-400'}">${isOnline ? 'En línea' : 'Desconectado'}</p>
+          <div>
+            <p class="text-sm font-medium text-gray-800">${escapeHtml(username)}</p>
+            <p class="text-xs ${isOnline ? "text-green-600" : "text-gray-400"}">
+              ${isOnline ? "En línea" : "Desconectado"}
+            </p>
           </div>
-          <button class="chat-user-btn opacity-0 group-hover:opacity-100 transition bg-blue-500 text-white p-1.5 rounded-full text-xs">
-            <i class="fas fa-comment"></i>
-          </button>
         </div>
       `;
-      
-      const chatBtn = li.querySelector(".chat-user-btn");
-      chatBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (!window.conversations[user.username]) {
-          window.conversations[user.username] = [];
-        }
-        window.currentChat = user.username;
-        document.getElementById("chat-title").innerText = user.username;
-        document.getElementById("chat-status").innerHTML = `<span class="${isOnline ? 'text-green-500' : 'text-gray-400'}">${isOnline ? 'En línea' : 'Desconectado'}</span>`;
-        window.ui.renderConversation(user.username);
+
+      li.addEventListener("click", () => {
+        window.currentChat = username;
+        window.ui.renderConversation(username);
         window.ui.renderConversationList();
       });
-      
-      container.appendChild(li);
+
+      list.appendChild(li);
     });
-    
-    document.getElementById("online-count").innerText = onlineCount;
   },
 
   // Alertas
   addAlert: (alert) => {
     const list = document.getElementById("alerts");
     const li = document.createElement("li");
-    li.className = "p-2 bg-yellow-50 border-l-4 border-yellow-400 rounded text-xs text-gray-800 animate-pulse";
+
+    li.className = "p-2 bg-yellow-50 border-l-4 border-yellow-400 rounded text-xs text-gray-800";
+
     li.innerHTML = `
       <div class="flex items-start space-x-2">
         <i class="fas fa-bell text-yellow-500 text-xs mt-0.5"></i>
@@ -193,12 +189,31 @@ window.ui = {
         </div>
       </div>
     `;
+
     list.prepend(li);
-    
-    if (list.children.length > 10) {
+
+    // EFÍMERAS: desaparecer a los 3 segundos
+    if (alert.ephemeral) {
+      setTimeout(() => li.remove(), 3000);
+    }
+
+    // Mantener máximo 10 alertas persistentes
+    if (!alert.ephemeral && list.children.length > 10) {
       list.removeChild(list.lastChild);
     }
+  },
+
+  showTyping: (username) => {
+    const el = document.getElementById("typing-indicator");
+    el.innerText = `${username} está escribiendo…`;
+  },
+
+  hideTyping: () => {
+    const el = document.getElementById("typing-indicator");
+    el.innerText = "";
   }
+
+
 };
 
 function escapeHtml(text) {

@@ -86,6 +86,10 @@ function ensureConversation(chatId) {
 }
 
 function initSocket() {
+  if (socket) {
+    socket.disconnect();
+  }
+  
   const token = localStorage.getItem("token");
   const username = localStorage.getItem("username");
 
@@ -248,26 +252,29 @@ function initSocket() {
   // Mensaje privado recibido (SOLO changefeed, sin push local previo)
   socket.on("private_message", (msg) => {
     const currentUser = localStorage.getItem("username");
-
     const other = msg.from === currentUser ? msg.to : msg.from;
+
     ensureConversation(other);
+    window.conversations[other].push(msg);
 
-    window.conversations[other].push({
-      from: msg.from,
-      to: msg.to,
-      text: msg.text,
-      createdAt: msg.createdAt
-    });
+    // Notificación si NO estás en ese chat
+    if (window.currentChat !== other) {
+      window.ui.addAlert({
+        type: "message",
+        text: `Nuevo mensaje de ${other}`,
+        ephemeral: true
+      });
 
-    if (!window.uiState.users.has(other)) {
-      window.uiState.users.set(other, { online: false });
-    }
-
-    if (window.currentChat === other) {
-      window.ui.renderConversation(other);
+      // Resaltar conversación
+      window.uiState.users.get(other).hasUnread = true;
     }
 
     window.ui.renderConversationList();
+
+    if (window.currentChat === other) {
+      window.uiState.users.get(other).hasUnread = false;
+      window.ui.renderConversation(other);
+    }
   });
 
   // Alertas
@@ -299,6 +306,32 @@ function initSocket() {
       document.getElementById("chat-send").click();
     }
   });
+
+  let typingTimeout = null;
+
+  document.getElementById("chat-input").addEventListener("input", () => {
+    if (window.currentChat === "general") return;
+
+    socket.emit("typing", { to: window.currentChat });
+
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+      socket.emit("stop_typing", { to: window.currentChat });
+    }, 1500);
+  });
+
+  socket.on("typing", (data) => {
+    if (window.currentChat === data.from) {
+      window.ui.showTyping(data.from);
+    }
+  });
+
+  socket.on("stop_typing", (data) => {
+    if (window.currentChat === data.from) {
+      window.ui.hideTyping();
+    }
+  });
+
 
   // Probar alerta
   document.getElementById("test-alert").addEventListener("click", () => {
