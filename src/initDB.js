@@ -4,11 +4,10 @@ import dotenv from "dotenv";
 dotenv.config();
 
 /**
- * Script para inicialización de la base de datos con sus tablas necesarias.
+ * Función para inicializar/verificar la base de datos
  * Crea la BD, tablas e índices si no existen.
  */
-
-async function init() {
+export async function initDatabase() {
   const conn = await r.connect({
     host: process.env.RETHINK_HOST,
     port: process.env.RETHINK_PORT
@@ -74,4 +73,7 @@ async function init() {
   console.log("Inicialización completada");
 }
 
-init().catch((err) => console.error(err));
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  initDatabase().catch((err) => console.error(err));
+}
