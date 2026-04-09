@@ -1,24 +1,22 @@
 version: '3.8'
 
 services:
-  # Servicio de RethinkDB
   rethinkdb:
     image: rethinkdb:latest
     container_name: rethinkdb
     ports:
-      - "28015:28015"  # Puerto del driver
-      - "8080:8080"    # Puerto del admin web
+      - "28015:28015"
+      - "8080:8080"
     volumes:
-      - rethinkdb_data:/data
-    environment:
-      - RETHINKDB_DB=rethinkchat
+      - rethinkdb_data:/data/rethinkdb
     command: rethinkdb --bind all --http-port 8080
     restart: unless-stopped
 
-  # Servicio de la aplicación Node.js
   app:
-    build: .
-    container_name: rethink-chat-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app
     ports:
       - "3000:3000"
     depends_on:
