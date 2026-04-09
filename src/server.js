@@ -23,6 +23,10 @@ const io = new Server(server, {
   cors: { origin: "*" }
 });
 
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 // Conectar DB y arrancar sockets
 connectDB().then((conn) => {
 
