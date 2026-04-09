@@ -94,7 +94,14 @@ function initSocket() {
   const token = localStorage.getItem("token");
   const username = localStorage.getItem("username");
 
-  socket = io("http://localhost:3000");
+  const getSocketUrl = () => {
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      return window.location.origin;
+    }
+    return 'http://localhost:3000';
+  };
+
+socket = io(getSocketUrl());
 
   socket.on("connect", async () => {
     socket.emit("identify", token);
