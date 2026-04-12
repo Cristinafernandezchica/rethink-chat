@@ -430,4 +430,29 @@ router.get("/message-history/:messageId", verifyTokenMiddleware, async (req, res
   }
 });
 
+// Obtener perfil de un usuario
+router.get("/user-profile/:username", verifyTokenMiddleware, async (req, res) => {
+  try {
+    const conn = req.app.get("dbConn");
+    const { username } = req.params;
+    
+    const user = await r.db(db)
+      .table("users")
+      .filter({ username })
+      .pluck("username", "avatar", "bio", "createdAt", "messageCount")
+      .run(conn);
+    
+    const userList = await user.toArray();
+    
+    if (userList.length === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+    
+    res.json({ user: userList[0] });
+  } catch (err) {
+    console.error("Error obteniendo perfil:", err);
+    res.status(500).json({ error: "Error al obtener perfil" });
+  }
+});
+
 export default router;

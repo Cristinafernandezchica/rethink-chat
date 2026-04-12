@@ -20,12 +20,32 @@ window.ui = {
         : "bg-white text-gray-800 rounded-bl-none border border-gray-200"
     }`;
     
-    if (!isMine) {
-      const name = document.createElement("div");
-      name.className = "text-xs font-semibold text-blue-600 mb-1";
-      name.innerText = msg.from || msg.username;
-      bubble.appendChild(name);
+  if (!isMine) {
+    const header = document.createElement("div");
+    header.className = "flex items-center gap-2 mb-1";
+    
+    // Avatar circular
+    const avatar = document.createElement("div");
+    avatar.className = "w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[10px] font-bold";
+    
+    // Obtener avatar del mensaje (msg.fromUser.avatar o primera letra)
+    const avatarLetter = (msg.fromUser?.avatar) || (msg.from || msg.username || "?").charAt(0).toUpperCase();
+    avatar.innerText = avatarLetter;
+    header.appendChild(avatar);
+    
+    // Nombre
+    const name = document.createElement("div");
+    name.className = "text-xs font-semibold text-blue-600";
+    name.innerText = msg.from || msg.username;
+    header.appendChild(name);
+    
+    // Bio opcional (tooltip)
+    if (msg.fromUser?.bio) {
+      name.title = msg.fromUser.bio;
     }
+    
+    bubble.appendChild(header);
+  }
     
     const text = document.createElement("div");
     text.className = "break-words text-sm";
@@ -385,7 +405,7 @@ window.ui = {
       window.ui.addAlert({ text: "Error: no hay conexión", ephemeral: true });
     }
   },
-  
+
   showMessageHistory: async (messageId, type) => {
     const token = localStorage.getItem("token");
     

@@ -35,10 +35,14 @@ export const register = async (req, res) => {
 
     // Insertar usuario con role
     await r.db(db).table("users").insert({
+      id: r.uuid(),
       username,
       password: hashed,
       role: "user",
-      createdAt: new Date()
+      createdAt: new Date(),
+      avatar: username.charAt(0).toUpperCase(),  // Primera letra como avatar
+      bio: "Hola, soy " + username,
+      messageCount: 0
     }).run(conn);
 
     conn.close();

@@ -82,11 +82,15 @@ window.chat = {
       window.ui.renderConversationList();
     });
 
-    // Reemplazar el handler de chat_history
     socket.on("chat_history", (messages) => {
     window.conversations.general = messages.map(m => ({
         id: m.id,
         from: m.username,
+        fromUser: {
+        username: m.username,
+        avatar: m.avatar || m.username.charAt(0).toUpperCase(),
+        bio: m.bio || ""
+        },
         to: "general",
         text: m.text,
         createdAt: m.createdAt,
@@ -99,11 +103,15 @@ window.chat = {
     }
     });
 
-    // Reemplazar el handler de new_message
     socket.on("new_message", (msg) => {
     window.conversations.general.push({
         id: msg.id,
         from: msg.username,
+        fromUser: {
+        username: msg.username,
+        avatar: msg.avatar || msg.username.charAt(0).toUpperCase(),
+        bio: msg.bio || ""
+        },
         to: "general",
         text: msg.text,
         createdAt: msg.createdAt,
@@ -226,6 +234,7 @@ window.chat = {
       console.error("Error cargando usuarios:", e);
     }
   },
+  
 
   loadUnreadCounts: async (token) => {
     try {
