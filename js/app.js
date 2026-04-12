@@ -3,6 +3,9 @@ window.conversations = {
   general: []
 };
 window.currentChat = "general";
+window.currentRoom = null;
+window.rooms = [];
+window.currentRoomMessages = {};
 
 let socket = null;
 
@@ -139,27 +142,20 @@ socket = io(getSocketUrl());
       console.error("Error cargando todos los usuarios:", e);
     }
 
-    // Cargar histórico de privados
+    // Cargar contadores de mensajes no leídos
     try {
-      const { ok, data } = await window.api.getPrivateHistory(token);
-      if (ok && Array.isArray(data)) {
-        data.forEach(c => {
-          ensureConversation(c.otherUser);
-          window.conversations[c.otherUser] = c.messages.map(msg => ({
-            from: msg.from,
-            to: msg.to,
-            text: msg.text,
-            createdAt: msg.createdAt
-          }));
-          if (!window.uiState.users.has(c.otherUser)) {
-            window.uiState.users.set(c.otherUser, { online: false });
-          }
-        });
+      const { ok, data } = await window.api.getUnreadCounts(token);
+      if (ok && data.unreadCounts) {
+        window.unreadCounts = data.unreadCounts;
         window.ui.renderConversationList();
       }
     } catch (e) {
-      console.error("Error cargando histórico privado:", e);
+      console.error("Error cargando contadores:", e);
     }
+
+    // El historial privado llega por socket ("private_history") desde el evento
+    // "identify". No se carga también por HTTP para evitar duplicados cuando
+    // el changefeed entrega un mensaje nuevo antes de que termine la petición REST.
   });
 
   // Estado inicial online
@@ -239,17 +235,38 @@ socket = io(getSocketUrl());
   });
 
   // Historial privados vía socket
+  // Usamos once() para que solo se procese en la conexión inicial.
+  // En reconexiones posteriores el historial se fusiona por id para evitar duplicados.
   socket.on("private_history", (convs) => {
-    console.log("Recibido historial privado vía socket:", convs.length);
-
     convs.forEach(c => {
       ensureConversation(c.otherUser);
-      window.conversations[c.otherUser] = c.messages.map(msg => ({
+
+      // Construir un Set con los ids ya presentes (llegados por changefeed antes que el historial)
+      const existingIds = new Set(
+        window.conversations[c.otherUser]
+          .filter(m => m.id)
+          .map(m => m.id)
+      );
+
+      // Añadir solo los mensajes históricos que aún no están en el array
+      const incoming = c.messages.map(msg => ({
+        id: msg.id,
         from: msg.from,
         to: msg.to,
         text: msg.text,
-        createdAt: msg.createdAt
+        createdAt: msg.createdAt,
+        read: msg.read
       }));
+
+      // Sustituir el array por el historial completo + los mensajes nuevos que
+      // llegaron por changefeed y que el historial aún no incluye (id desconocido)
+      const historyIds = new Set(incoming.filter(m => m.id).map(m => m.id));
+      const pendingNewMessages = window.conversations[c.otherUser].filter(
+        m => m.id && !historyIds.has(m.id)
+      );
+
+      window.conversations[c.otherUser] = [...incoming, ...pendingNewMessages];
+
       if (!window.uiState.users.has(c.otherUser)) {
         window.uiState.users.set(c.otherUser, { online: false });
       }
@@ -261,16 +278,27 @@ socket = io(getSocketUrl());
     }
   });
 
-  // Mensaje privado recibido
+  // Mensaje privado recibido - actualizar contadores
   socket.on("private_message", (msg) => {
     const currentUser = localStorage.getItem("username");
     const other = msg.from === currentUser ? msg.to : msg.from;
 
     ensureConversation(other);
+
+    // Deduplicar siempre por id antes de hacer push
+    const alreadyExists = msg.id && window.conversations[other].some(m => m.id === msg.id);
+    if (alreadyExists) return;
+
     window.conversations[other].push(msg);
 
     if (!window.uiState.users.has(other)) {
       window.uiState.users.set(other, { online: false, hasUnread: false });
+    }
+
+    // Actualizar contador de no leídos si no es el usuario actual quien envía
+    if (msg.to === currentUser && msg.read === false) {
+      if (!window.unreadCounts) window.unreadCounts = {};
+      window.unreadCounts[other] = (window.unreadCounts[other] || 0) + 1;
     }
 
     // Notificación si NO estás en ese chat
@@ -280,7 +308,6 @@ socket = io(getSocketUrl());
         text: `Nuevo mensaje de ${other}`,
         ephemeral: true
       });
-
       window.uiState.users.get(other).hasUnread = true;
     }
 
@@ -402,5 +429,124 @@ socket = io(getSocketUrl());
       alertModal.classList.add("hidden");
       alertText.value = "";
     });
+  }
+
+
+  // BÚSQUEDA DE MENSAJES
+  const searchInput = document.getElementById("search-input");
+  const searchClear = document.getElementById("search-clear");
+  const searchResults = document.getElementById("search-results");
+
+  let searchTimeout = null;
+
+  searchInput.addEventListener("input", () => {
+    clearTimeout(searchTimeout);
+    const query = searchInput.value.trim();
+    
+    if (query.length < 2) {
+      searchResults.classList.add("hidden");
+      searchClear.classList.add("hidden");
+      return;
+    }
+    
+    searchClear.classList.remove("hidden");
+    
+    searchTimeout = setTimeout(async () => {
+      const token = localStorage.getItem("token");
+      const { ok, data } = await window.api.searchMessages(token, query);
+      
+      if (ok && data.results) {
+        displaySearchResults(data.results, query);
+      }
+    }, 500);
+  });
+
+  searchClear.addEventListener("click", () => {
+    searchInput.value = "";
+    searchResults.classList.add("hidden");
+    searchClear.classList.add("hidden");
+  });
+
+  function displaySearchResults(results, query) {
+    if (results.length === 0) {
+      searchResults.innerHTML = `<p class="text-sm text-gray-500 p-2">No se encontraron resultados para "${escapeHtml(query)}"</p>`;
+      searchResults.classList.remove("hidden");
+      return;
+    }
+    
+    let html = `<div class="text-xs text-gray-500 mb-2 p-1">Resultados para "${escapeHtml(query)}"</div>`;
+    
+    results.forEach(result => {
+      if (result.chatType === "global") {
+        // Mensaje global individual
+        html += `
+          <div class="search-result-item p-2 hover:bg-gray-100 rounded cursor-pointer mb-1" data-chat="general" data-message-id="${result.id}">
+            <div class="flex justify-between items-start">
+              <span class="text-xs font-semibold text-blue-600">${escapeHtml(result.username)}</span>
+              <span class="text-xs text-gray-400">${new Date(result.createdAt).toLocaleTimeString()}</span>
+            </div>
+            <p class="text-sm text-gray-700">${highlightText(result.text, query)}</p>
+            <span class="text-xs text-gray-400">📍 Chat General</span>
+          </div>
+        `;
+      } else if (result.chatType === "private" && result.messages) {
+        // Agrupar por conversación privada
+        html += `
+          <div class="search-result-conversation p-2 hover:bg-gray-100 rounded cursor-pointer mb-2" data-chat="${result.chatName}">
+            <div class="flex items-center space-x-2 mb-1">
+              <i class="fas fa-lock text-gray-400 text-xs"></i>
+              <span class="text-sm font-semibold text-gray-700">${escapeHtml(result.chatName)}</span>
+              <span class="text-xs text-gray-400">${result.messages.length} mensajes</span>
+            </div>
+            <div class="pl-4 space-y-1">
+        `;
+        result.messages.forEach(msg => {
+          html += `
+            <div class="text-xs text-gray-600">
+              <span class="font-medium">${escapeHtml(msg.from)}:</span>
+              <span>${highlightText(msg.text, query)}</span>
+            </div>
+          `;
+        });
+        html += `</div></div>`;
+      }
+    });
+    
+    searchResults.innerHTML = html;
+    searchResults.classList.remove("hidden");
+    
+    // Añadir event listeners a los resultados
+    document.querySelectorAll(".search-result-item").forEach(el => {
+      el.addEventListener("click", () => {
+        const chatId = el.dataset.chat;
+        if (chatId) {
+          window.currentChat = chatId;
+          window.ui.renderConversation(chatId);
+          searchResults.classList.add("hidden");
+          searchInput.value = "";
+        }
+      });
+    });
+    
+    document.querySelectorAll(".search-result-conversation").forEach(el => {
+      el.addEventListener("click", () => {
+        const chatId = el.dataset.chat;
+        if (chatId) {
+          window.currentChat = chatId;
+          window.ui.renderConversation(chatId);
+          searchResults.classList.add("hidden");
+          searchInput.value = "";
+        }
+      });
+    });
+  }
+
+  function highlightText(text, query) {
+    const regex = new RegExp(`(${escapeRegex(query)})`, "gi");
+    return text.replace(regex, `<mark class="bg-yellow-200">$1</mark>`);
+  }
+
+  function escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }

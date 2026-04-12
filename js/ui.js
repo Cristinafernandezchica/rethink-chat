@@ -57,14 +57,16 @@ window.ui = {
   },
 
   // Render lista de conversaciones
+  // En ui.js, actualizar renderConversationList
   renderConversationList: () => {
     const list = document.getElementById("conversation-list");
     if (!list) return;
     
     list.innerHTML = "";
     const currentUser = localStorage.getItem("username");
+    const unreadCounts = window.unreadCounts || {}; // Variable global para contadores
     
-    // Ordenar conversaciones: primero las que tienen mensajes no leídos
+    // Ordenar conversaciones
     const sorted = Object.keys(window.conversations).sort((a, b) => {
       if (a === "general") return -1;
       if (b === "general") return 1;
@@ -79,6 +81,7 @@ window.ui = {
       const userState = window.uiState.users.get(chatId);
       const isOnline = userState?.online || false;
       const lastMessage = window.conversations[chatId][window.conversations[chatId].length - 1];
+      const unreadCount = unreadCounts[chatId] || 0;
       
       const li = document.createElement("li");
       li.className = `conversation-item cursor-pointer transition-all duration-200 ${
@@ -100,15 +103,33 @@ window.ui = {
             </div>
             ${lastMessage ? `<p class="text-sm text-gray-500 truncate">${escapeHtml(lastMessage.text.substring(0, 50))}</p>` : '<p class="text-sm text-gray-400 italic">Sin mensajes</p>'}
           </div>
+          ${unreadCount > 0 ? `
+            <div class="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              ${unreadCount > 9 ? '9+' : unreadCount}
+            </div>
+          ` : ''}
         </div>
       `;
       
-      li.addEventListener("click", () => {
+      li.addEventListener("click", async () => {
         window.currentChat = chatId;
         document.getElementById("chat-title").innerText = displayName;
         const statusText = isGeneral ? "Grupo público" : (isOnline ? "En línea" : "Desconectado");
         const statusColor = isOnline ? "text-green-500" : "text-gray-400";
         document.getElementById("chat-status").innerHTML = `<span class="${statusColor}">${statusText}</span>`;
+        
+        // Marcar como leídos al abrir la conversación (solo para privados)
+        if (!isGeneral && unreadCount > 0) {
+          const token = localStorage.getItem("token");
+          await window.api.markMessagesAsRead(token, chatId);
+          // Actualizar contador local
+          if (window.unreadCounts) {
+            delete window.unreadCounts[chatId];
+          }
+          // Re-renderizar lista
+          window.ui.renderConversationList();
+        }
+        
         window.ui.renderConversation(chatId);
         window.ui.highlightConversation(chatId);
       });

@@ -50,5 +50,40 @@ window.api = {
     });
     const data = await res.json();
     return { ok: res.ok, data };
+  },
+
+  searchMessages: async (token, query, type = "all") => {
+    const res = await fetch(`${API_URL}/messages/search?q=${encodeURIComponent(query)}&type=${type}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+    const data = await res.json();
+    return { ok: res.ok, data };
+  },
+
+  markMessagesAsRead: async (token, otherUser) => {
+    const res = await fetch(`${API_URL}/messages/mark-read`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ otherUser })
+    });
+    const data = await res.json();
+    return { ok: res.ok, data };
+  },
+
+  getUnreadCounts: async (token) => {
+    const res = await fetch(`${API_URL}/messages/unread-counts`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+    const data = await res.json();
+    return { ok: res.ok, data };
   }
 };

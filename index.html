@@ -137,12 +137,17 @@
           </div>
         </div>
 
-        <!-- Búsqueda -->
+        <!-- Búsqueda - Mejorada -->
         <div class="p-3 bg-white border-b">
           <div class="relative">
             <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
-            <input id="search-users" type="text" placeholder="Buscar conversaciones..." class="w-full pl-9 pr-3 py-2 bg-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <input id="search-input" type="text" placeholder="Buscar mensajes..." class="w-full pl-9 pr-10 py-2 bg-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <button id="search-clear" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 hidden">
+              <i class="fas fa-times text-xs"></i>
+            </button>
           </div>
+          <!-- Resultados de búsqueda -->
+          <div id="search-results" class="hidden mt-2 max-h-96 overflow-y-auto border-t pt-2"></div>
         </div>
 
         <!-- Lista de conversaciones -->

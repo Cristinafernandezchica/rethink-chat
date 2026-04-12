@@ -50,10 +50,12 @@ export function registerSocketHandlers(io, conn) {
           }
 
           conversationsMap.get(otherUser).push({
+            id: msg.id,
             from: msg.from,
             to: msg.to,
             text: msg.text,
-            createdAt: msg.createdAt
+            createdAt: msg.createdAt,
+            read: msg.read
           });
         });
 
@@ -62,7 +64,11 @@ export function registerSocketHandlers(io, conn) {
           messages
         }));
 
-        socket.emit("private_history", conversations);
+        // Solo emitir historial una vez por sesión de socket
+        if (!socket.historySent) {
+          socket.historySent = true;
+          socket.emit("private_history", conversations);
+        }
 
       } catch (err) {
         console.error("Token inválido:", err.message);
@@ -97,11 +103,12 @@ export function registerSocketHandlers(io, conn) {
         from: data.from,
         to: data.to,
         text: data.text,
-        createdAt: new Date()
+        createdAt: new Date(),
+        read: false
       };
 
       await r.db(db).table("private_messages").insert(message).run(conn);
-      // changefeed se encarga de emitir a from/to
+      // changefeed se encarga de emitir a los participantes
     });
 
     // ALERTAS (persistentes + efímeras) — UN SOLO HANDLER
@@ -143,6 +150,85 @@ export function registerSocketHandlers(io, conn) {
       const target = [...io.sockets.sockets.values()].find(s => s.username === data.to);
       if (target) {
         target.emit("stop_typing", { from: socket.username });
+      }
+    });
+
+    socket.on("join_room", async (roomId) => {
+      if (!socket.username) return;
+      
+      // Verificar que el usuario es miembro de la sala
+      const memberCheck = await r.db(db)
+        .table("room_members")
+        .filter({ roomId, username: socket.username })
+        .run(conn);
+      
+      const isMember = (await memberCheck.toArray()).length > 0;
+      
+      if (isMember) {
+        // Salir de sala anterior si existía
+        if (socket.currentRoom) {
+          socket.leave(`room:${socket.currentRoom}`);
+        }
+        
+        socket.currentRoom = roomId;
+        socket.join(`room:${roomId}`);
+        console.log(`${socket.username} se unió a la sala ${roomId}`);
+        
+        // Enviar historial de la sala
+        const history = await r.db(db)
+          .table("room_messages")
+          .filter({ roomId })
+          .orderBy(r.asc("createdAt"))
+          .limit(100)
+          .run(conn);
+        
+        const messages = await history.toArray();
+        socket.emit("room_history", { roomId, messages });
+      }
+    });
+
+    // Enviar mensaje a una sala
+    socket.on("room_message", async (data) => {
+      const { roomId, text } = data;
+      
+      if (!socket.username || !roomId || !text) return;
+      
+      // Verificar membresía
+      const memberCheck = await r.db(db)
+        .table("room_members")
+        .filter({ roomId, username: socket.username })
+        .run(conn);
+      
+      const isMember = (await memberCheck.toArray()).length > 0;
+      
+      if (!isMember) {
+        socket.emit("error", { message: "No eres miembro de esta sala" });
+        return;
+      }
+      
+      const message = {
+        roomId,
+        username: socket.username,
+        text: text.trim(),
+        createdAt: new Date(),
+        edited: false,
+        deleted: false
+      };
+      
+      // Guardar en DB
+      const result = await r.db(db).table("room_messages").insert(message).run(conn);
+      message.id = result.generated_keys[0];
+      
+      // Emitir a todos en la sala (incluyendo al emisor)
+      io.to(`room:${roomId}`).emit("room_message", message);
+    });
+
+    // Salir de una sala (opcional)
+    socket.on("leave_room", async () => {
+      if (socket.currentRoom) {
+        socket.leave(`room:${socket.currentRoom}`);
+        console.log(`${socket.username} salió de la sala ${socket.currentRoom}`);
+        socket.currentRoom = null;
       }
     });
 
