@@ -217,4 +217,217 @@ router.get("/unread-counts", verifyTokenMiddleware, async (req, res) => {
   }
 });
 
+// EDITAR MENSAJE GENERAL
+router.put("/edit-message/:messageId", verifyTokenMiddleware, async (req, res) => {
+  try {
+    const conn = req.app.get("dbConn");
+    const { messageId } = req.params;
+    const { newText } = req.body;
+    const currentUser = req.user.username;
+
+    if (!newText || newText.trim().length === 0) {
+      return res.status(400).json({ error: "El mensaje no puede estar vacío" });
+    }
+
+    // Buscar el mensaje original
+    const cursor = await r.db(db)
+      .table("messages")
+      .get(messageId)
+      .run(conn);
+
+    if (!cursor) {
+      return res.status(404).json({ error: "Mensaje no encontrado" });
+    }
+
+    // Verificar que el usuario es el autor
+    if (cursor.username !== currentUser && req.user.role !== "admin") {
+      return res.status(403).json({ error: "No autorizado para editar este mensaje" });
+    }
+
+    // Guardar el texto original si es la primera edición
+    const editEntry = {
+      text: cursor.text,
+      editedAt: new Date(),
+      editedBy: currentUser
+    };
+
+    const editHistory = cursor.editHistory || [];
+    editHistory.push(editEntry);
+
+    // Actualizar el mensaje
+    const result = await r.db(db)
+      .table("messages")
+      .get(messageId)
+      .update({
+        text: newText,
+        edited: true,
+        editHistory: editHistory,
+        lastEditedAt: new Date(),
+        lastEditedBy: currentUser,
+        originalText: cursor.edited ? cursor.originalText : cursor.text
+      })
+      .run(conn);
+
+    if (result.replaced === 0 && result.unchanged === 0) {
+      return res.status(500).json({ error: "No se pudo actualizar el mensaje" });
+    }
+
+    // Obtener el mensaje actualizado
+    const updatedMessage = await r.db(db)
+      .table("messages")
+      .get(messageId)
+      .run(conn);
+
+    res.json({ 
+      success: true, 
+      message: updatedMessage,
+      editHistory: editHistory
+    });
+
+  } catch (err) {
+    console.error("Error editando mensaje:", err);
+    res.status(500).json({ error: "Error al editar el mensaje" });
+  }
+});
+
+// EDITAR MENSAJE PRIVADO
+router.put("/edit-private-message/:messageId", verifyTokenMiddleware, async (req, res) => {
+  try {
+    const conn = req.app.get("dbConn");
+    const { messageId } = req.params;
+    const { newText } = req.body;
+    const currentUser = req.user.username;
+
+    if (!newText || newText.trim().length === 0) {
+      return res.status(400).json({ error: "El mensaje no puede estar vacío" });
+    }
+
+    const cursor = await r.db(db)
+      .table("private_messages")
+      .get(messageId)
+      .run(conn);
+
+    if (!cursor) {
+      return res.status(404).json({ error: "Mensaje no encontrado" });
+    }
+
+    if (cursor.from !== currentUser && req.user.role !== "admin") {
+      return res.status(403).json({ error: "No autorizado" });
+    }
+
+    const editEntry = {
+      text: cursor.text,
+      editedAt: new Date(),
+      editedBy: currentUser
+    };
+
+    const editHistory = cursor.editHistory || [];
+    editHistory.push(editEntry);
+
+    const result = await r.db(db)
+      .table("private_messages")
+      .get(messageId)
+      .update({
+        text: newText,
+        edited: true,
+        editHistory: editHistory,
+        lastEditedAt: new Date(),
+        lastEditedBy: currentUser,
+        originalText: cursor.edited ? cursor.originalText : cursor.text
+      })
+      .run(conn);
+
+    const updatedMessage = await r.db(db)
+      .table("private_messages")
+      .get(messageId)
+      .run(conn);
+
+    res.json({ success: true, message: updatedMessage });
+
+  } catch (err) {
+    console.error("Error editando mensaje privado:", err);
+    res.status(500).json({ error: "Error al editar el mensaje" });
+  }
+});
+
+// BORRAR MENSAJE (soft delete)
+router.delete("/delete-message/:messageId", verifyTokenMiddleware, async (req, res) => {
+  try {
+    const conn = req.app.get("dbConn");
+    const { messageId } = req.params;
+    const { type = "global" } = req.query;
+    const currentUser = req.user.username;
+
+    const table = type === "private" ? "private_messages" : "messages";
+    
+    const cursor = await r.db(db)
+      .table(table)
+      .get(messageId)
+      .run(conn);
+
+    if (!cursor) {
+      return res.status(404).json({ error: "Mensaje no encontrado" });
+    }
+
+    const isAuthor = type === "private" 
+      ? cursor.from === currentUser 
+      : cursor.username === currentUser;
+
+    if (!isAuthor && req.user.role !== "admin") {
+      return res.status(403).json({ error: "No autorizado" });
+    }
+
+    // Soft delete - solo marcar como borrado
+    const result = await r.db(db)
+      .table(table)
+      .get(messageId)
+      .update({
+        deleted: true,
+        deletedAt: new Date(),
+        deletedBy: currentUser,
+        text: "[Mensaje eliminado]"
+      })
+      .run(conn);
+
+    res.json({ success: true, messageId });
+
+  } catch (err) {
+    console.error("Error borrando mensaje:", err);
+    res.status(500).json({ error: "Error al borrar el mensaje" });
+  }
+});
+
+// OBTENER HISTORIAL DE EDICIONES
+router.get("/message-history/:messageId", verifyTokenMiddleware, async (req, res) => {
+  try {
+    const conn = req.app.get("dbConn");
+    const { messageId } = req.params;
+    const { type = "global" } = req.query;
+
+    const table = type === "private" ? "private_messages" : "messages";
+    
+    const message = await r.db(db)
+      .table(table)
+      .get(messageId)
+      .run(conn);
+
+    if (!message) {
+      return res.status(404).json({ error: "Mensaje no encontrado" });
+    }
+
+    res.json({ 
+      editHistory: message.editHistory || [],
+      currentText: message.text,
+      originalText: message.originalText,
+      edited: message.edited || false,
+      lastEditedAt: message.lastEditedAt,
+      lastEditedBy: message.lastEditedBy
+    });
+
+  } catch (err) {
+    console.error("Error obteniendo historial:", err);
+    res.status(500).json({ error: "Error al obtener historial" });
+  }
+});
+
 export default router;

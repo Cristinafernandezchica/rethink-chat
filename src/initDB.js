@@ -40,6 +40,55 @@ export async function initDatabase() {
     }
   }
 
+  // --- MIGRACIÓN: Añadir campos de edición/borrado a mensajes existentes ---
+  try {
+    // Migrar mensajes generales
+    const messagesNeedUpdate = await r.db(dbName)
+      .table("messages")
+      .filter(r.row.hasFields("edited").not())
+      .update({
+        edited: false,
+        editHistory: [],
+        deleted: false,
+        originalText: null,
+        lastEditedAt: null,
+        lastEditedBy: null,
+        deletedAt: null,
+        deletedBy: null
+      })
+      .run(conn);
+    
+    if (messagesNeedUpdate.replaced > 0 || messagesNeedUpdate.unchanged > 0) {
+      console.log(`[INFO] Migrados ${messagesNeedUpdate.replaced} mensajes con nuevos campos`);
+    }
+  } catch (err) {
+    console.log("[INFO] No fue necesario migrar mensajes o ya están actualizados");
+  }
+
+  try {
+    // Migrar mensajes privados
+    const privateNeedUpdate = await r.db(dbName)
+      .table("private_messages")
+      .filter(r.row.hasFields("edited").not())
+      .update({
+        edited: false,
+        editHistory: [],
+        deleted: false,
+        originalText: null,
+        lastEditedAt: null,
+        lastEditedBy: null,
+        deletedAt: null,
+        deletedBy: null
+      })
+      .run(conn);
+    
+    if (privateNeedUpdate.replaced > 0 || privateNeedUpdate.unchanged > 0) {
+      console.log(`[INFO] Migrados ${privateNeedUpdate.replaced} mensajes privados con nuevos campos`);
+    }
+  } catch (err) {
+    console.log("[INFO] No fue necesario migrar mensajes privados");
+  }
+
   // --- CREAR ÍNDICES (después de que todas las tablas existen) ---
   
   // Índices para tabla "messages"
@@ -51,14 +100,12 @@ export async function initDatabase() {
       console.log("[INFO] Índice 'createdAt' creado en messages");
     }
     
-    // Índice de búsqueda de texto CORREGIDO
+    // Índice de búsqueda de texto
     if (!messagesIndexes.includes("search")) {
-      // RethinkDB usa indexCreate con función y opción multi: true para búsqueda de texto
       await r.db(dbName).table("messages").indexCreate("search", r.row("text"), { multi: true });
       console.log("[INFO] Índice de búsqueda 'search' creado en messages");
     }
     
-    // Esperar a que los índices estén listos
     await r.db(dbName).table("messages").indexWait().run(conn);
     console.log("[INFO] Índices de messages listos");
   } catch (err) {
@@ -93,7 +140,7 @@ export async function initDatabase() {
     console.error("[ERROR] Error creando índices en online_users:", err.message);
   }
 
-  // Índices para tabla "private_messages" (útil para búsquedas)
+  // Índices para tabla "private_messages"
   try {
     const privateIndexes = await r.db(dbName).table("private_messages").indexList().run(conn);
     
@@ -118,7 +165,6 @@ export async function initDatabase() {
     const adminUsername = process.env.ADMIN_USERNAME || "admin";
     const adminPassword = process.env.ADMIN_PASSWORD || "admin";
     
-    // Verificar si ya existe el usuario admin
     const existingAdmin = await r.db(dbName)
       .table("users")
       .filter({ username: adminUsername })
@@ -127,10 +173,8 @@ export async function initDatabase() {
     const adminArray = await existingAdmin.toArray();
     
     if (adminArray.length === 0) {
-      // Hashear contraseña
       const hashedPassword = await bcrypt.hash(adminPassword, 10);
       
-      // Crear usuario admin
       await r.db(dbName).table("users").insert({
         username: adminUsername,
         password: hashedPassword,
@@ -148,7 +192,7 @@ export async function initDatabase() {
     console.error("[ERROR] Error creando usuario admin:", err.message);
   }
 
-  // --- OPCIONAL: Crear algunos mensajes de ejemplo si la tabla está vacía ---
+  // --- Crear mensajes de ejemplo si la tabla está vacía ---
   try {
     const messageCount = await r.db(dbName).table("messages").count().run(conn);
     
@@ -156,14 +200,22 @@ export async function initDatabase() {
       console.log("[INFO] Creando mensajes de ejemplo...");
       await r.db(dbName).table("messages").insert([
         {
+          id: r.uuid(),
           username: "system",
           text: "¡Bienvenido al chat! Este es un mensaje de ejemplo.",
-          createdAt: new Date()
+          createdAt: new Date(),
+          edited: false,
+          editHistory: [],
+          deleted: false
         },
         {
+          id: r.uuid(),
           username: "system",
           text: "Los mensajes privados funcionan haciendo clic en cualquier usuario.",
-          createdAt: new Date(Date.now() - 60000)
+          createdAt: new Date(Date.now() - 60000),
+          edited: false,
+          editHistory: [],
+          deleted: false
         }
       ]).run(conn);
       console.log("[INFO] Mensajes de ejemplo creados");

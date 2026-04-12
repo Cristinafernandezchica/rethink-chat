@@ -31,13 +31,13 @@ export async function connectDB() {
   const port = process.env.RETHINK_PORT;
   const db = process.env.RETHINK_DB;
 
-  console.log("📡 Configuración de conexión:");
-  console.log("   RETHINK_HOST:", host || "❌ NO DEFINIDO");
-  console.log("   RETHINK_PORT:", port || "❌ NO DEFINIDO");
-  console.log("   RETHINK_DB:", db || "❌ NO DEFINIDO");
+  console.log("Configuración de conexión:");
+  console.log("   RETHINK_HOST:", host || "NO DEFINIDO");
+  console.log("   RETHINK_PORT:", port || "NO DEFINIDO");
+  console.log("   RETHINK_DB:", db || "NO DEFINIDO");
 
   if (!host || !port || !db) {
-    console.error("❌ Faltan variables de entorno para conectar a RethinkDB");
+    console.error("Faltan variables de entorno para conectar a RethinkDB");
     throw new Error("Variables de entorno de RethinkDB no configuradas");
   }
 
@@ -49,10 +49,10 @@ export async function connectDB() {
       timeout: 30
     });
 
-    console.log("✔ Conectado a RethinkDB en", `${host}:${port}`);
+    console.log("Conectado a RethinkDB en", `${host}:${port}`);
     return connection;
   } catch (err) {
-    console.error("❌ Error conectando a RethinkDB:", err.message);
+    console.error("Error conectando a RethinkDB:", err.message);
     throw err;
   }
 }

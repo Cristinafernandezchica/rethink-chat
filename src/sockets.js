@@ -55,7 +55,10 @@ export function registerSocketHandlers(io, conn) {
             to: msg.to,
             text: msg.text,
             createdAt: msg.createdAt,
-            read: msg.read
+            read: msg.read,
+            edited: msg.edited || false,
+            deleted: msg.deleted || false,
+            editHistory: msg.editHistory || []
           });
         });
 
@@ -85,33 +88,47 @@ export function registerSocketHandlers(io, conn) {
     const history = await cursor.toArray();
     socket.emit("chat_history", history);
 
-    // MENSAJE GENERAL
+    // MENSAJE GENERAL - CORREGIDO: AÑADIR ID Y CAMPOS DE EDICIÓN
     socket.on("send_message", async (data) => {
       const message = {
+        id: r.uuid(),  // ← IMPORTANTE: Generar ID único
         text: data.text,
         username: data.username,
-        createdAt: new Date()
+        createdAt: new Date(),
+        edited: false,
+        editHistory: [],
+        deleted: false,
+        originalText: null,
+        lastEditedAt: null,
+        lastEditedBy: null
       };
 
       await r.db(db).table("messages").insert(message).run(conn);
       // changefeed se encarga de emitir
     });
 
-    // MENSAJE PRIVADO
+    // MENSAJE PRIVADO - CORREGIDO: AÑADIR CAMPOS DE EDICIÓN
     socket.on("private_message", async (data) => {
       const message = {
+        id: r.uuid(),  // ← IMPORTANTE: Generar ID único
         from: data.from,
         to: data.to,
         text: data.text,
         createdAt: new Date(),
-        read: false
+        read: false,
+        edited: false,
+        editHistory: [],
+        deleted: false,
+        originalText: null,
+        lastEditedAt: null,
+        lastEditedBy: null
       };
 
       await r.db(db).table("private_messages").insert(message).run(conn);
       // changefeed se encarga de emitir a los participantes
     });
 
-    // ALERTAS (persistentes + efímeras) — UN SOLO HANDLER
+    // ALERTAS (persistentes + efímeras)
     socket.on("send_alert", async (data) => {
       const alert = {
         type: data.type || "info",
@@ -121,23 +138,18 @@ export function registerSocketHandlers(io, conn) {
         createdAt: new Date()
       };
 
-      // EFÍMERAS
       if (alert.ephemeral) {
         if (alert.to) {
-          // privada
           const target = [...io.sockets.sockets.values()].find(s => s.username === alert.to);
           if (target) target.emit("alert", alert);
         } else {
-          // global
           io.emit("alert", alert);
         }
         return;
       }
 
-      // PERSISTENTES: El changefeed se encarga de la emisión
       await r.db(db).table("alerts").insert(alert).run(conn);
     });
-
 
     socket.on("typing", (data) => {
       const target = [...io.sockets.sockets.values()].find(s => s.username === data.to);
@@ -156,7 +168,6 @@ export function registerSocketHandlers(io, conn) {
     socket.on("join_room", async (roomId) => {
       if (!socket.username) return;
       
-      // Verificar que el usuario es miembro de la sala
       const memberCheck = await r.db(db)
         .table("room_members")
         .filter({ roomId, username: socket.username })
@@ -165,7 +176,6 @@ export function registerSocketHandlers(io, conn) {
       const isMember = (await memberCheck.toArray()).length > 0;
       
       if (isMember) {
-        // Salir de sala anterior si existía
         if (socket.currentRoom) {
           socket.leave(`room:${socket.currentRoom}`);
         }
@@ -174,7 +184,6 @@ export function registerSocketHandlers(io, conn) {
         socket.join(`room:${roomId}`);
         console.log(`${socket.username} se unió a la sala ${roomId}`);
         
-        // Enviar historial de la sala
         const history = await r.db(db)
           .table("room_messages")
           .filter({ roomId })
@@ -187,13 +196,11 @@ export function registerSocketHandlers(io, conn) {
       }
     });
 
-    // Enviar mensaje a una sala
     socket.on("room_message", async (data) => {
       const { roomId, text } = data;
       
       if (!socket.username || !roomId || !text) return;
       
-      // Verificar membresía
       const memberCheck = await r.db(db)
         .table("room_members")
         .filter({ roomId, username: socket.username })
@@ -207,6 +214,7 @@ export function registerSocketHandlers(io, conn) {
       }
       
       const message = {
+        id: r.uuid(),
         roomId,
         username: socket.username,
         text: text.trim(),
@@ -215,15 +223,11 @@ export function registerSocketHandlers(io, conn) {
         deleted: false
       };
       
-      // Guardar en DB
-      const result = await r.db(db).table("room_messages").insert(message).run(conn);
-      message.id = result.generated_keys[0];
+      await r.db(db).table("room_messages").insert(message).run(conn);
       
-      // Emitir a todos en la sala (incluyendo al emisor)
       io.to(`room:${roomId}`).emit("room_message", message);
     });
 
-    // Salir de una sala (opcional)
     socket.on("leave_room", async () => {
       if (socket.currentRoom) {
         socket.leave(`room:${socket.currentRoom}`);
@@ -243,15 +247,221 @@ export function registerSocketHandlers(io, conn) {
           .run(conn);
       }
     });
+
+    // EDITAR MENSAJE GENERAL - CORREGIDO
+    socket.on("edit_message", async (data) => {
+      const { messageId, newText } = data;
+      
+      try {
+        const message = await r.db(db)
+          .table("messages")
+          .get(messageId)
+          .run(conn);
+
+        if (!message) {
+          socket.emit("error", { message: "Mensaje no encontrado" });
+          return;
+        }
+        
+        // Verificar autor (usando username en lugar de from)
+        if (message.username !== socket.username && socket.role !== "admin") {
+          socket.emit("error", { message: "No autorizado" });
+          return;
+        }
+
+        const editEntry = {
+          text: message.text,
+          editedAt: new Date(),
+          editedBy: socket.username
+        };
+
+        const editHistory = message.editHistory || [];
+        editHistory.push(editEntry);
+
+        const updatedMessage = await r.db(db)
+          .table("messages")
+          .get(messageId)
+          .update({
+            text: newText,
+            edited: true,
+            editHistory: editHistory,
+            lastEditedAt: new Date(),
+            lastEditedBy: socket.username,
+            originalText: message.originalText || message.text
+          }, { returnChanges: true })
+          .run(conn);
+        
+        // Emitir el mensaje actualizado directamente
+        if (updatedMessage.changes && updatedMessage.changes[0]) {
+          io.emit("message_edited", updatedMessage.changes[0].new_val);
+        }
+      } catch (err) {
+        console.error("Error editando mensaje por socket:", err);
+        socket.emit("error", { message: "Error al editar mensaje" });
+      }
+    });
+
+    // EDITAR MENSAJE PRIVADO
+    socket.on("edit_private_message", async (data) => {
+      const { messageId, newText } = data;
+      
+      try {
+        const message = await r.db(db)
+          .table("private_messages")
+          .get(messageId)
+          .run(conn);
+
+        if (!message) {
+          socket.emit("error", { message: "Mensaje no encontrado" });
+          return;
+        }
+        
+        if (message.from !== socket.username && socket.role !== "admin") {
+          socket.emit("error", { message: "No autorizado" });
+          return;
+        }
+
+        const editEntry = {
+          text: message.text,
+          editedAt: new Date(),
+          editedBy: socket.username
+        };
+
+        const editHistory = message.editHistory || [];
+        editHistory.push(editEntry);
+
+        const updatedMessage = await r.db(db)
+          .table("private_messages")
+          .get(messageId)
+          .update({
+            text: newText,
+            edited: true,
+            editHistory: editHistory,
+            lastEditedAt: new Date(),
+            lastEditedBy: socket.username,
+            originalText: message.originalText || message.text
+          }, { returnChanges: true })
+          .run(conn);
+        
+        // Emitir a los participantes
+        if (updatedMessage.changes && updatedMessage.changes[0]) {
+          const newMessage = updatedMessage.changes[0].new_val;
+          const sockets = [...io.sockets.sockets.values()];
+          sockets.forEach(s => {
+            if (s.username === newMessage.from || s.username === newMessage.to) {
+              s.emit("private_message_edited", newMessage);
+            }
+          });
+        }
+      } catch (err) {
+        console.error("Error editando mensaje privado:", err);
+        socket.emit("error", { message: "Error al editar mensaje" });
+      }
+    });
+
+    // BORRAR MENSAJE GENERAL - CORREGIDO
+    socket.on("delete_message", async (data) => {
+      const { messageId } = data;
+      
+      try {
+        const message = await r.db(db)
+          .table("messages")
+          .get(messageId)
+          .run(conn);
+
+        if (!message) {
+          socket.emit("error", { message: "Mensaje no encontrado" });
+          return;
+        }
+
+        if (message.username !== socket.username && socket.role !== "admin") {
+          socket.emit("error", { message: "No autorizado" });
+          return;
+        }
+
+        const updatedMessage = await r.db(db)
+          .table("messages")
+          .get(messageId)
+          .update({
+            deleted: true,
+            deletedAt: new Date(),
+            deletedBy: socket.username,
+            text: "[Mensaje eliminado]"
+          }, { returnChanges: true })
+          .run(conn);
+        
+        if (updatedMessage.changes && updatedMessage.changes[0]) {
+          io.emit("message_deleted", updatedMessage.changes[0].new_val);
+        }
+      } catch (err) {
+        console.error("Error borrando mensaje:", err);
+        socket.emit("error", { message: "Error al borrar mensaje" });
+      }
+    });
+
+    // BORRAR MENSAJE PRIVADO
+    socket.on("delete_private_message", async (data) => {
+      const { messageId } = data;
+      
+      try {
+        const message = await r.db(db)
+          .table("private_messages")
+          .get(messageId)
+          .run(conn);
+
+        if (!message) {
+          socket.emit("error", { message: "Mensaje no encontrado" });
+          return;
+        }
+
+        if (message.from !== socket.username && socket.role !== "admin") {
+          socket.emit("error", { message: "No autorizado" });
+          return;
+        }
+
+        const updatedMessage = await r.db(db)
+          .table("private_messages")
+          .get(messageId)
+          .update({
+            deleted: true,
+            deletedAt: new Date(),
+            deletedBy: socket.username,
+            text: "[Mensaje eliminado]"
+          }, { returnChanges: true })
+          .run(conn);
+        
+        if (updatedMessage.changes && updatedMessage.changes[0]) {
+          const newMessage = updatedMessage.changes[0].new_val;
+          const sockets = [...io.sockets.sockets.values()];
+          sockets.forEach(s => {
+            if (s.username === newMessage.from || s.username === newMessage.to) {
+              s.emit("private_message_deleted", newMessage);
+            }
+          });
+        }
+      } catch (err) {
+        console.error("Error borrando mensaje privado:", err);
+        socket.emit("error", { message: "Error al borrar mensaje" });
+      }
+    });
+
   });
 
   // CHANGEFEED CHAT GENERAL
-  r.db(db).table("messages").changes().run(conn, (err, cursor) => {
+  r.db(db).table("messages").changes({ includeInitial: false }).run(conn, (err, cursor) => {
     if (err) return console.error(err);
 
     cursor.each((err, change) => {
       if (change?.new_val) {
-        io.emit("new_message", change.new_val);
+        if (change.old_val && change.old_val.text !== change.new_val.text) {
+          io.emit("message_edited", change.new_val);
+        }
+        else if (change.new_val.deleted === true && (!change.old_val || !change.old_val.deleted)) {
+          io.emit("message_deleted", change.new_val);
+        }
+        else if (!change.old_val) {
+          io.emit("new_message", change.new_val);
+        }
       }
     });
   });

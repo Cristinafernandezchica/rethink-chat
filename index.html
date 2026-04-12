@@ -14,64 +14,8 @@
   <!-- Socket.io -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
-  <style>
-    * {
-      scrollbar-width: thin;
-    }
-    
-    /* Custom scrollbar */
-    .messages-container::-webkit-scrollbar {
-      width: 6px;
-    }
-    
-    .messages-container::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    
-    .messages-container::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 10px;
-    }
-    
-    /* Animaciones */
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-    
-    .message-animation {
-      animation: slideIn 0.2s ease-out;
-    }
-    
-    /* Efecto hover en conversaciones */
-    .conversation-item:hover {
-      background-color: #f1f5f9;
-      transform: translateX(2px);
-      transition: all 0.2s;
-    }
-    
-    /* Online indicator pulse */
-    @keyframes pulse {
-      0%, 100% {
-        transform: scale(1);
-        opacity: 1;
-      }
-      50% {
-        transform: scale(1.2);
-        opacity: 0.7;
-      }
-    }
-    
-    .online-pulse {
-      animation: pulse 1.5s infinite;
-    }
-  </style>
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 <body class="bg-gradient-to-br from-slate-900 to-slate-800">
 
@@ -137,7 +81,7 @@
           </div>
         </div>
 
-        <!-- Búsqueda - Mejorada -->
+        <!-- Búsqueda -->
         <div class="p-3 bg-white border-b">
           <div class="relative">
             <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
@@ -146,7 +90,6 @@
               <i class="fas fa-times text-xs"></i>
             </button>
           </div>
-          <!-- Resultados de búsqueda -->
           <div id="search-results" class="hidden mt-2 max-h-96 overflow-y-auto border-t pt-2"></div>
         </div>
 
@@ -261,8 +204,24 @@
     </div>
   </div>
 
+  <div id="edit-modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-xl shadow-xl w-96">
+      <h3 class="font-semibold mb-3">Editar mensaje</h3>
+      <textarea id="edit-text" class="w-full border p-2 rounded mb-3" rows="3"></textarea>
+      <div class="flex justify-end space-x-2">
+        <button id="edit-cancel" class="px-3 py-1 bg-gray-200 rounded">Cancelar</button>
+        <button id="edit-save" class="px-3 py-1 bg-blue-500 text-white rounded">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
   <script src="js/api.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/chat.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/admin.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
