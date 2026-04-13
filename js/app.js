@@ -15,4 +15,6 @@ window.addEventListener("DOMContentLoaded", () => {
   window.auth.init();
   window.search.init();
   window.admin.init();
+  if (window.stats) window.stats.init();
+  if (window.geolocation) window.geolocation.init();
 });

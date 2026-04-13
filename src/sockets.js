@@ -1,11 +1,80 @@
 import r from "rethinkdb";
 import { verifyToken } from "./auth.js";
 
+// Función auxiliar para obtener resultados de búsqueda
+async function getSearchResults(conn, searchTerm, currentUser) {
+  const db = process.env.RETHINK_DB;
+  const results = [];
+  
+  // Buscar en mensajes globales
+  const globalCursor = await r.db(db)
+    .table("messages")
+    .filter(r.row("text").match(`(?i)${searchTerm}`))
+    .filter(r.row("deleted").eq(false))
+    .orderBy(r.desc("createdAt"))
+    .limit(30)
+    .run(conn);
+  
+  const globalResults = await globalCursor.toArray();
+  results.push(...globalResults.map(msg => ({
+    id: msg.id,
+    text: msg.text,
+    username: msg.username,
+    createdAt: msg.createdAt,
+    chatType: "global",
+    chatName: "Chat General"
+  })));
+  
+  // Buscar en mensajes privados
+  const privateCursor = await r.db(db)
+    .table("private_messages")
+    .filter(r.row("text").match(`(?i)${searchTerm}`))
+    .filter(r.row("deleted").eq(false))
+    .filter(r.row("from").eq(currentUser).or(r.row("to").eq(currentUser)))
+    .orderBy(r.desc("createdAt"))
+    .limit(30)
+    .run(conn);
+  
+  const privateResults = await privateCursor.toArray();
+  
+  // Agrupar por conversación
+  const convMap = new Map();
+  privateResults.forEach(msg => {
+    const otherUser = msg.from === currentUser ? msg.to : msg.from;
+    if (!convMap.has(otherUser)) {
+      convMap.set(otherUser, []);
+    }
+    convMap.get(otherUser).push({
+      id: msg.id,
+      text: msg.text,
+      from: msg.from,
+      to: msg.to,
+      createdAt: msg.createdAt,
+      chatType: "private",
+      chatName: otherUser
+    });
+  });
+  
+  for (const [otherUser, messages] of convMap) {
+    results.push({
+      chatType: "private",
+      chatName: otherUser,
+      messages: messages.slice(0, 10)
+    });
+  }
+  
+  return results;
+}
+
 export function registerSocketHandlers(io, conn) {
   const db = process.env.RETHINK_DB;
 
   io.on("connection", async (socket) => {
     console.log("Usuario conectado:", socket.id);
+
+    // Almacenar la suscripción activa de búsqueda para este socket
+    let currentSearchSubscription = null;
+    let currentSearchTerm = "";
 
     // IDENTIFICACIÓN DEL USUARIO (JWT)
     socket.on("identify", async (token) => {
@@ -88,10 +157,116 @@ export function registerSocketHandlers(io, conn) {
     const history = await cursor.toArray();
     socket.emit("chat_history", history);
 
-    // MENSAJE GENERAL - CORREGIDO: AÑADIR ID Y CAMPOS DE EDICIÓN
+    // SUSCRIPCIÓN A BÚSQUEDA EN TIEMPO REAL
+    socket.on("subscribe_search", async (searchTerm) => {
+      // Limpiar suscripción anterior si existe
+      if (currentSearchSubscription) {
+        try {
+          currentSearchSubscription.close();
+        } catch (e) {
+          console.error("Error cerrando suscripción anterior:", e);
+        }
+        currentSearchSubscription = null;
+      }
+
+      currentSearchTerm = searchTerm;
+
+      if (!searchTerm || searchTerm.trim().length < 2) {
+        socket.emit("search_results", { results: [], searchTerm: "" });
+        return;
+      }
+
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      const currentUser = socket.username;
+
+      // --- 1. Enviar los resultados iniciales ---
+      try {
+        const initialResults = await getSearchResults(conn, lowerSearchTerm, currentUser);
+        socket.emit("search_results", { results: initialResults, searchTerm });
+      } catch (err) {
+        console.error("Error obteniendo resultados iniciales:", err);
+        socket.emit("search_results", { results: [], searchTerm });
+        return;
+      }
+
+      // --- 2. Función para emitir actualizaciones ---
+      const emitUpdate = async () => {
+        try {
+          const updatedResults = await getSearchResults(conn, lowerSearchTerm, currentUser);
+          socket.emit("search_results", { results: updatedResults, searchTerm });
+        } catch (err) {
+          console.error("Error actualizando resultados:", err);
+        }
+      };
+
+      // --- 3. Escuchar cambios en la tabla 'messages' (chat general) ---
+      r.db(db).table("messages")
+        .filter(r.row("deleted").eq(false))
+        .changes({ includeInitial: false })
+        .run(conn, (err, cursor) => {
+          if (err) {
+            console.error("Error en changefeed de messages:", err);
+            return;
+          }
+          currentSearchSubscription = cursor;
+          
+          cursor.each(async (err, change) => {
+            if (err) {
+              console.error("Error en cambio de messages:", err);
+              return;
+            }
+            const newMsg = change.new_val;
+            const oldMsg = change.old_val;
+            
+            // Verificar si el mensaje coincide con la búsqueda actual
+            const matches = (msg) => {
+              if (!msg || !msg.text || msg.deleted) return false;
+              return msg.text.toLowerCase().includes(lowerSearchTerm);
+            };
+            
+            if ((newMsg && matches(newMsg)) || (oldMsg && matches(oldMsg))) {
+              await emitUpdate();
+            }
+          });
+        });
+
+      // --- 4. Escuchar cambios en la tabla 'private_messages' ---
+      r.db(db).table("private_messages")
+        .filter(r.row("deleted").eq(false))
+        .changes({ includeInitial: false })
+        .run(conn, (err, cursor) => {
+          if (err) {
+            console.error("Error en changefeed de private_messages:", err);
+            return;
+          }
+          
+          cursor.each(async (err, change) => {
+            if (err) {
+              console.error("Error en cambio de private_messages:", err);
+              return;
+            }
+            const newMsg = change.new_val;
+            
+            const matches = (msg) => {
+              if (!msg || !msg.text || msg.deleted) return false;
+              return msg.text.toLowerCase().includes(lowerSearchTerm);
+            };
+            
+            const canAccess = (msg) => {
+              return msg && (msg.from === currentUser || msg.to === currentUser);
+            };
+            
+            if (newMsg && canAccess(newMsg) && matches(newMsg)) {
+              await emitUpdate();
+            }
+          });
+        });
+    });
+
+    // MENSAJE GENERAL
     socket.on("send_message", async (data) => {
       const message = {
-        id: r.uuid(),  // ← IMPORTANTE: Generar ID único
+        id: r.uuid(),
         text: data.text,
         username: data.username,
         createdAt: new Date(),
@@ -104,13 +279,12 @@ export function registerSocketHandlers(io, conn) {
       };
 
       await r.db(db).table("messages").insert(message).run(conn);
-      // changefeed se encarga de emitir
     });
 
-    // MENSAJE PRIVADO - CORREGIDO: AÑADIR CAMPOS DE EDICIÓN
+    // MENSAJE PRIVADO
     socket.on("private_message", async (data) => {
       const message = {
-        id: r.uuid(),  // ← IMPORTANTE: Generar ID único
+        id: r.uuid(),
         from: data.from,
         to: data.to,
         text: data.text,
@@ -125,7 +299,6 @@ export function registerSocketHandlers(io, conn) {
       };
 
       await r.db(db).table("private_messages").insert(message).run(conn);
-      // changefeed se encarga de emitir a los participantes
     });
 
     // ALERTAS (persistentes + efímeras)
@@ -240,6 +413,15 @@ export function registerSocketHandlers(io, conn) {
     socket.on("disconnect", async () => {
       console.log("Usuario desconectado:", socket.id);
 
+      // Limpiar suscripción de búsqueda
+      if (currentSearchSubscription) {
+        try {
+          currentSearchSubscription.close();
+        } catch (e) {
+          console.error("Error cerrando suscripción en disconnect:", e);
+        }
+      }
+
       if (socket.username) {
         await r.db(db).table("online_users")
           .filter({ socketId: socket.id })
@@ -248,7 +430,7 @@ export function registerSocketHandlers(io, conn) {
       }
     });
 
-    // EDITAR MENSAJE GENERAL - CORREGIDO
+    // EDITAR MENSAJE GENERAL
     socket.on("edit_message", async (data) => {
       const { messageId, newText } = data;
       
@@ -263,7 +445,6 @@ export function registerSocketHandlers(io, conn) {
           return;
         }
         
-        // Verificar autor (usando username en lugar de from)
         if (message.username !== socket.username && socket.role !== "admin") {
           socket.emit("error", { message: "No autorizado" });
           return;
@@ -291,7 +472,6 @@ export function registerSocketHandlers(io, conn) {
           }, { returnChanges: true })
           .run(conn);
         
-        // Emitir el mensaje actualizado directamente
         if (updatedMessage.changes && updatedMessage.changes[0]) {
           io.emit("message_edited", updatedMessage.changes[0].new_val);
         }
@@ -343,7 +523,6 @@ export function registerSocketHandlers(io, conn) {
           }, { returnChanges: true })
           .run(conn);
         
-        // Emitir a los participantes
         if (updatedMessage.changes && updatedMessage.changes[0]) {
           const newMessage = updatedMessage.changes[0].new_val;
           const sockets = [...io.sockets.sockets.values()];
@@ -359,7 +538,7 @@ export function registerSocketHandlers(io, conn) {
       }
     });
 
-    // BORRAR MENSAJE GENERAL - CORREGIDO
+    // BORRAR MENSAJE GENERAL
     socket.on("delete_message", async (data) => {
       const { messageId } = data;
       

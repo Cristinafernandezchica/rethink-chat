@@ -4,6 +4,46 @@ import bcrypt from "bcrypt";
 
 dotenv.config();
 
+// Función para crear tabla geoespacial de ubicaciones de usuarios
+async function setupGeospatialTable(conn, dbName) {
+  try {
+    const tables = await r.db(dbName).tableList().run(conn);
+    
+    if (!tables.includes("user_locations")) {
+      await r.db(dbName).tableCreate("user_locations").run(conn);
+      console.log("[INFO] Tabla 'user_locations' creada");
+    } else {
+      console.log("[INFO] Tabla 'user_locations' ya existe");
+    }
+    
+    // Crear índice geoespacial
+    const indexes = await r.db(dbName).table("user_locations").indexList().run(conn);
+    
+    if (!indexes.includes("location")) {
+      await r.db(dbName)
+        .table("user_locations")
+        .indexCreate("location", { geo: true })
+        .run(conn);
+      console.log("[INFO] Índice geoespacial 'location' creado en user_locations");
+    }
+    
+    // Índice secundario para búsqueda por username
+    if (!indexes.includes("username")) {
+      await r.db(dbName)
+        .table("user_locations")
+        .indexCreate("username")
+        .run(conn);
+      console.log("[INFO] Índice 'username' creado en user_locations");
+    }
+    
+    await r.db(dbName).table("user_locations").indexWait().run(conn);
+    console.log("[INFO] Índices geoespaciales listos");
+    
+  } catch (err) {
+    console.error("[ERROR] Configurando tabla geoespacial:", err.message);
+  }
+}
+
 /**
  * Función para inicializar/verificar la base de datos
  * Crea la BD, tablas e índices si no existen.
@@ -26,8 +66,8 @@ export async function initDatabase() {
     console.log(`[INFO] Base de datos ya existe: ${dbName}`);
   }
 
-  // Crear tablas si no existen
-  const tables = ["users", "messages", "private_messages", "alerts", "online_users"];
+  // Crear tablas si no existen (incluyendo user_locations)
+  const tables = ["users", "messages", "private_messages", "alerts", "online_users", "user_locations"];
 
   const tableList = await r.db(dbName).tableList().run(conn);
 
@@ -39,6 +79,9 @@ export async function initDatabase() {
       console.log(`[INFO] Tabla ya existe: ${table}`);
     }
   }
+
+  // --- CONFIGURAR ÍNDICES GEOESPACIALES ---
+  await setupGeospatialTable(conn, dbName);
 
   // --- MIGRACIÓN: Añadir campos de edición/borrado a mensajes existentes ---
   try {
@@ -160,6 +203,20 @@ export async function initDatabase() {
     console.error("[ERROR] Error creando índices en private_messages:", err.message);
   }
 
+  // Índices para tabla "user_locations" (geoespaciales ya creados en setupGeospatialTable)
+  try {
+    const locationIndexes = await r.db(dbName).table("user_locations").indexList().run(conn);
+    
+    if (!locationIndexes.includes("updatedAt")) {
+      await r.db(dbName).table("user_locations").indexCreate("updatedAt").run(conn);
+      console.log("[INFO] Índice 'updatedAt' creado en user_locations");
+    }
+    
+    await r.db(dbName).table("user_locations").indexWait().run(conn);
+  } catch (err) {
+    console.error("[ERROR] Error creando índices adicionales en user_locations:", err.message);
+  }
+
   // --- CREAR USUARIO ADMIN POR DEFECTO ---
   try {
     const adminUsername = process.env.ADMIN_USERNAME || "admin";
@@ -213,6 +270,15 @@ export async function initDatabase() {
           username: "system",
           text: "Los mensajes privados funcionan haciendo clic en cualquier usuario.",
           createdAt: new Date(Date.now() - 60000),
+          edited: false,
+          editHistory: [],
+          deleted: false
+        },
+        {
+          id: r.uuid(),
+          username: "system",
+          text: "📍 También puedes compartir tu ubicación y ver usuarios cercanos en el mapa.",
+          createdAt: new Date(Date.now() - 120000),
           edited: false,
           editHistory: [],
           deleted: false

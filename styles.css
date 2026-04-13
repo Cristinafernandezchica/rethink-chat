@@ -68,3 +68,146 @@
   background: #cbd5f5;
   border-radius: 999px;
 }
+
+/* Estilos para el buscador en tiempo real */
+#search-results {
+  max-height: 400px;
+  overflow-y: auto;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.search-result-item, .search-result-conversation {
+  transition: all 0.2s ease;
+}
+
+.search-result-item:hover, .search-result-conversation:hover {
+  transform: translateX(4px);
+  background-color: #eff6ff !important;
+}
+
+mark {
+  background-color: #fef08a;
+  padding: 0 2px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.search-results-updated {
+  animation: pulse-green 0.5s ease;
+}
+
+/* Estilos para el scroll suave */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Animación de resaltado para mensajes */
+@keyframes highlight-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.2);
+  }
+}
+
+.message-highlight {
+  animation: highlight-pulse 0.5s ease-out;
+}
+
+/* Mejoras para los resultados de búsqueda */
+.search-result-conversation {
+  margin-bottom: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.search-result-conversation:hover {
+  transform: translateX(2px);
+}
+
+.search-result-message {
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.search-result-message:hover {
+  background-color: #eff6ff !important;
+  padding-left: 12px;
+}
+
+#close-search-results {
+  transition: all 0.2s ease;
+}
+
+#close-search-results:hover {
+  background-color: #f3f4f6;
+}
+
+/* Estilos para el modal de estadísticas */
+#stats-modal .bg-white {
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Tooltip para las gráficas */
+.group:hover .group-hover\:block {
+  display: block;
+}
+
+@keyframes fade-out {
+  0% { opacity: 1; transform: translateY(0); }
+  70% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-20px); }
+}
+
+.animate-fade-out {
+  animation: fade-out 2s ease forwards;
+}
+
+/* Marcadores del mapa */
+.own-marker div, .user-marker div {
+  transition: all 0.2s ease;
+}
+
+.user-marker div:hover {
+  transform: scale(1.2);
+  background-color: #3b82f6 !important;
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse {
+  animation: pulse-green 1.5s infinite;
+}
