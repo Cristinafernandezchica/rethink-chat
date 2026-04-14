@@ -30,8 +30,24 @@ jobs:
       - name: Install standard-version
         run: npm install -g standard-version
 
+      - name: Determine version
+        id: version
+        run: |
+          TAG_COUNT=$(git tag | wc -l)
+          if [ "$TAG_COUNT" -eq "0" ]; then
+            echo "first_release=3.0.0" >> $GITHUB_OUTPUT
+          else
+            echo "first_release=" >> $GITHUB_OUTPUT
+          fi
+
       - name: Generate changelog
-        run: standard-version --release-as patch
+        run: |
+          if [ -n "${{ steps.version.outputs.first_release }}" ]; then
+            echo "No tags found. Forcing version 3.0.0"
+            standard-version --release-as ${{ steps.version.outputs.first_release }}
+          else
+            standard-version
+          fi
 
       - name: Push changes
         run: |
