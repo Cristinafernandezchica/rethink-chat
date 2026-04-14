@@ -3,6 +3,7 @@ name: Auto Changelog
 on:
   push:
     branches:
+      - master
       - prueba-changelog
 
 jobs:
@@ -18,7 +19,12 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install standard-version (temporal)
+      - name: Configure Git identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install standard-version
         run: npm install -g standard-version
 
       - name: Generate changelog
@@ -26,6 +32,4 @@ jobs:
 
       - name: Push changes
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git push --follow-tags origin main
+          git push --follow-tags origin HEAD
