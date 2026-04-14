@@ -1,6 +1,6 @@
 {
   "name": "rethink-chat",
-  "version": "1.0.1",
+  "version": "3.0.0",
   "main": "index.js",
   "type": "module",
   "scripts": {
