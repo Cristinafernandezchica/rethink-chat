@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+.env.local
+.git
+.gitignore
+README.md
+.vscode
+.idea
+logs
+*.log
+.DS_Store
+rethinkdb_data

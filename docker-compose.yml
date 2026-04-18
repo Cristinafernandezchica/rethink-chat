@@ -1,0 +1,53 @@
+services:
+  # Base de datos RethinkDB
+  rethinkdb:
+    image: rethinkdb:2.4
+    container_name: rethink-chat-db
+    restart: unless-stopped
+    ports:
+      - "28015:28015"
+      - "8081:8080"
+      - "29015:29015"
+    volumes:
+      - rethinkdb_data:/data
+    command: rethinkdb --bind all --http-port 8080 --driver-port 28015 --cluster-port 29015 --directory /data
+    healthcheck:
+      test: ["CMD", "rethinkdb", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - chat-network
+
+  # Aplicación Node.js
+  app:
+    build: .
+    container_name: rethink-chat-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      - rethinkdb
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET:-mi_secreto_seguro_123}
+      - RETHINK_HOST=rethinkdb
+      - RETHINK_PORT=28015
+      - RETHINK_DB=${RETHINK_DB:-rethinkchat}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+    volumes:
+      - ./src:/app/src:ro
+      - ./public:/app/public:ro
+      - ./package.json:/app/package.json:ro
+    networks:
+      - chat-network
+
+networks:
+  chat-network:
+    driver: bridge
+
+volumes:
+  rethinkdb_data:
+    driver: local
