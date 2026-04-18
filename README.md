@@ -1,6 +1,6 @@
 # rethink-chat
 
-Rethibk-chat es una aplicación de mensajería realizada para un trabajo enmarcado en la asigantura Complemento de Bases de Datos.
+Rethink-chat es una aplicación de mensajería realizada para un trabajo enmarcado en la asigantura Complemento de Bases de Datos.
 
 La aplicación se encuentra desplegada en: [rethink-chat](https://rethink-chat-production.up.railway.app/)
 
@@ -162,6 +162,9 @@ EOF
 
 #### **4. Inicializar la base de datos**
 ```
+# Arrancar rethinkdb (desde una terminal)
+rethinkdb
+
 # Crear tablas e índices
 npm run initdb
 
@@ -184,6 +187,19 @@ npm start
 
 + **rethink-chat**: http://localhost:3000
 + **rethinkdb**: http://localhost:8080
+
+Para este caso, el usuario administrador de la aplicación se creará con las siguientes credenciales:
+```
+Usuario: admin
+Contraseña: admin
+```
+
+En caso de saltar un error en las credenciales, usar las mismas credenciales que para el resto de instalaciones:
+
+```
+Usuario: admin
+Contraseña: admin123
+```
 
 
 ## Instalación en Windows
@@ -238,7 +254,7 @@ docker compose up -d
 docker compose ps
 ```
 
-#### **7. Abrimos la aplicación en http://localhost:3000
+#### **7. Abrimos la aplicación en http://localhost:3000**
 
 
 ## Manual de usuario
@@ -247,19 +263,78 @@ A continuación, se va a explicar el funcionamiento de cada una de las funcional
 
 ### Registro/Inicio de sesión
 
+En primer lugar tenemos la pantalla de registro e inicio de sesión. Para registrarnos en la aplicación, utilizamos un nombre de usuario. Una vez registrados, tendremos que iniciar sesión. El registro no inicia sesión automáticamente, nos a parecerá un mensaje: "Cuenta creada. AHora inicia sesión.".
+
+![Registro](./img/registro.png)
+
+![Inicio de sesión](./img/inicio-sesion.png)
+
 ### Chat general
+
+Nada más iniciar sesión, nos aparecerá el chat general de la aplicación, donde todos los usuarios pueden mandar mensajes:
+
+![Chat General](./img/chat-general.png)
+
+Aquí tendremos varios mensajes predeterminados que explican las funcionalidades básicas de la aplicación. Desde aquí podemos enviar mensajes, editarlos o eliminarlos:
+
+![Envio, Edición y Borrado de mensajes](./img/envio-borrado-edicion.png)
+
+La edición se realizará mediante un modal:
+
+![Edición](./img/editar-mensaje.png)
+
+Además, al eliminar o editar un mensaje nos aparecerá una alerta efíera en la ventana de alertas de la esquina inferior derecha.
+
+![Alerta eliminación](./img/alerta-eliminacion.png)     ![Alerta edición](./img/alerta-edicion.png)
 
 ### Mensajes privados
 
-### Edición y borrado de mensajes
+Podemos enviar mensajes a usuarios específicos de la aplicación, seleccionádolo en el sidebar izquierdo. De igual forma que en el chat general, podemos enviar mensajes, borrarlos o editarlos.
 
-### Alertas
+![Chat privado](./img/chat-privado.png)
+
+En los chats privados, si no has leído el mensaje te aparecerá el contador de mensajes sin leer en el chat correspondiente de la siguiente manera:
+
+![Contador mensajes sin leer](./img/contador-mensajes.png)
 
 ### Usuarios online
 
+El estado de los usuarios en el aplicación lo podemos ver en el sidebar izquierdo, mediante los puntos verdes en el icono de aquellos usuarios que se encuentran en línea, o en el sidebar izquierdo, que es la sección verdaderamente dedicada a ello.
+
+![Usuarios online](./img/usuarios-online.png)
+
 ### Alertas
 
-### Estadísticas
+Desde el usuario administrador podremos enviar alertas a todos los usuarios del sistema. Esto lo podremos hacer mediante las acciones que encontramos en la esquina inferior derecha desde el usuario administrador:
+
+![Usuario administrador](./img/panel-administrador.png)
+
+
+Desde aquí, podremos enviar alertas globales persistentes para todos los usuarios, o alertas efímeras (desaparecen a los 3 segundos):
+
+![Envío alerta global](./img/envio-alerta-global.png)
+
+![Alertas](./img/alertas.png)
+
 
 ### Geolocalización
 
+Otra de las funcionalidades implementadas, es un mapa donde se pueden ver los usuarios cercanos. A este podemos acceder desde el icono del mapa en el sidebar izquierdo, en la parte superiro. Veremos algo así al entrar:
+
+![Mapa usuarios](./img/mapa-geolocalizacion.png)
+
+Desde aquí, si compartimos la ubicación, apareceremos ubicados en el mapa, de la siguiente manera:
+
+![Ubicación propia](./img/ubicacion-propia.png)
+
+Además, podremos hacer una búsqueda de los usuarios cercanos, puediendo filtrar por ratio hasta 25km. Si nos vamos a otro usuario, y hacemos búsqueda de los usuarios cercanos, nos aparecerá el resto de usuarios activosa nuestro alrededor:
+
+![Ubicación otros](./img/ubicacion-otro.png)
+
+### Estadísticas
+
+Por último, tenemos la funcionalidad que nos ofrece varias estadísticas de uso de la aplicación. Estas solo son accesibles desde el perfil de usuario administrador. Se accede mediante el botón "Estadísticas avanzadas" que está junto al envío de las alertas. Tienen el siguiente aspecto:
+
+![Estadísticas](./img/estadisticas-1.png)
+
+![Estadísticas](./img/estadisticas-2.png)
