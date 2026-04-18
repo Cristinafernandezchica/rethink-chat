@@ -1,3 +1,4 @@
 node_modules/
 .env
 rethinkdb_data/
+.env.example
