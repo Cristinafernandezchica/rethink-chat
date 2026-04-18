@@ -1,12 +1,12 @@
 # rethink-chat
 
-Rethink-chat es una aplicación de mensajería realizada para un trabajo enmarcado en la asigantura Complemento de Bases de Datos.
+Rethink-chat es una aplicación de mensajería realizada para un trabajo enmarcado en la asignatura Complemento de Bases de Datos.
 
 La aplicación se encuentra desplegada en: [rethink-chat](https://rethink-chat-production.up.railway.app/)
 
 A continuación se explicará cómo instalar y arrancar el sistema de varias formas ([Linux](#instalación-en-linux-ubuntu) o [Windows](#instalación-en-windows)).
 
-Ademas, se explicará cómo utilizar la aplicacón en la sección [Manual de usuario](#manual-de-usuario).
+Además, se explicará cómo utilizar la aplicación en la sección [Manual de usuario](#manual-de-usuario).
 
 ## Instalación en Linux (Ubuntu)
 
@@ -16,7 +16,7 @@ Para la instalación y arranque del sistema tenemos dos opciones, una que implic
 
 En primer lugar, necesitaremos tener docker y docker compose instalados.
 
-#### **1. Intalación de Docker y Docker Compose**
+#### **1. Instalación de Docker y Docker Compose**
 Hay que seguir los siguientes pasos:
 
 
@@ -113,7 +113,7 @@ node --version  # v20.x
 npm --version   # 10.x
 ```
 
-#### **2. Instalar RethikDB**
+#### **2. Instalar RethinkDB**
 ```
 # Agregar repositorio de RethinkDB
 source /etc/lsb-release
@@ -248,7 +248,7 @@ ADMIN_PASSWORD=admin123
 docker compose up -d
 ```
 
-#### Verficamos el estado
+#### Verificamos el estado
 
 ```
 docker compose ps
@@ -263,7 +263,7 @@ A continuación, se va a explicar el funcionamiento de cada una de las funcional
 
 ### Registro/Inicio de sesión
 
-En primer lugar tenemos la pantalla de registro e inicio de sesión. Para registrarnos en la aplicación, utilizamos un nombre de usuario. Una vez registrados, tendremos que iniciar sesión. El registro no inicia sesión automáticamente, nos a parecerá un mensaje: "Cuenta creada. AHora inicia sesión.".
+En primer lugar tenemos la pantalla de registro e inicio de sesión. Para registrarnos en la aplicación, utilizamos un nombre de usuario. Una vez registrados, tendremos que iniciar sesión. El registro no inicia sesión automáticamente, nos aparecerá un mensaje: "Cuenta creada. AHora inicia sesión.".
 
 ![Registro](./img/registro.png)
 
@@ -283,13 +283,13 @@ La edición se realizará mediante un modal:
 
 ![Edición](./img/editar-mensaje.png)
 
-Además, al eliminar o editar un mensaje nos aparecerá una alerta efíera en la ventana de alertas de la esquina inferior derecha.
+Además, al eliminar o editar un mensaje nos aparecerá una alerta efímera en la ventana de alertas de la esquina inferior derecha.
 
 ![Alerta eliminación](./img/alerta-eliminacion.png)     ![Alerta edición](./img/alerta-edicion.png)
 
 ### Mensajes privados
 
-Podemos enviar mensajes a usuarios específicos de la aplicación, seleccionádolo en el sidebar izquierdo. De igual forma que en el chat general, podemos enviar mensajes, borrarlos o editarlos.
+Podemos enviar mensajes a usuarios específicos de la aplicación, seleccionándolo en el sidebar izquierdo. De igual forma que en el chat general, podemos enviar mensajes, borrarlos o editarlos.
 
 ![Chat privado](./img/chat-privado.png)
 
@@ -299,7 +299,7 @@ En los chats privados, si no has leído el mensaje te aparecerá el contador de 
 
 ### Usuarios online
 
-El estado de los usuarios en el aplicación lo podemos ver en el sidebar izquierdo, mediante los puntos verdes en el icono de aquellos usuarios que se encuentran en línea, o en el sidebar izquierdo, que es la sección verdaderamente dedicada a ello.
+El estado de los usuarios en la aplicación lo podemos ver en el sidebar izquierdo, mediante los puntos verdes en el icono de aquellos usuarios que se encuentran en línea, o en el sidebar izquierdo, que es la sección verdaderamente dedicada a ello.
 
 ![Usuarios online](./img/usuarios-online.png)
 
@@ -319,7 +319,7 @@ Desde aquí, podremos enviar alertas globales persistentes para todos los usuari
 
 ### Geolocalización
 
-Otra de las funcionalidades implementadas, es un mapa donde se pueden ver los usuarios cercanos. A este podemos acceder desde el icono del mapa en el sidebar izquierdo, en la parte superiro. Veremos algo así al entrar:
+Otra de las funcionalidades implementadas, es un mapa donde se pueden ver los usuarios cercanos. A este podemos acceder desde el icono del mapa en el sidebar izquierdo, en la parte superior. Veremos algo así al entrar:
 
 ![Mapa usuarios](./img/mapa-geolocalizacion.png)
 
@@ -327,7 +327,7 @@ Desde aquí, si compartimos la ubicación, apareceremos ubicados en el mapa, de 
 
 ![Ubicación propia](./img/ubicacion-propia.png)
 
-Además, podremos hacer una búsqueda de los usuarios cercanos, puediendo filtrar por ratio hasta 25km. Si nos vamos a otro usuario, y hacemos búsqueda de los usuarios cercanos, nos aparecerá el resto de usuarios activosa nuestro alrededor:
+Además, podremos hacer una búsqueda de los usuarios cercanos, pudiendo filtrar por ratio hasta 25km. Si nos vamos a otro usuario, y hacemos búsqueda de los usuarios cercanos, nos aparecerá el resto de usuarios activos a nuestro alrededor:
 
 ![Ubicación otros](./img/ubicacion-otro.png)
 
