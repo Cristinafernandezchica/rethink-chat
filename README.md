@@ -12,9 +12,9 @@ Además, se explicará cómo utilizar la aplicación en la sección [Manual de u
 
 Para la instalación y arranque del sistema tenemos dos opciones, una que implica el uso de Docker y Docker Compose, de forma que con levantar el contenedor es suficiente, y otra sin docker.
 
-### Docker + Docker compose
+### Docker + Docker Compose
 
-En primer lugar, necesitaremos tener docker y docker compose instalados.
+En primer lugar, necesitaremos tener Docker y Docker Compose instalados.
 
 #### **1. Instalación de Docker y Docker Compose**
 Hay que seguir los siguientes pasos:
@@ -162,7 +162,7 @@ EOF
 
 #### **4. Inicializar la base de datos**
 ```
-# Arrancar rethinkdb (desde una terminal)
+# Arrancar RethinkDB (desde una terminal)
 rethinkdb
 
 # Crear tablas e índices
@@ -263,7 +263,7 @@ A continuación, se va a explicar el funcionamiento de cada una de las funcional
 
 ### Registro/Inicio de sesión
 
-En primer lugar tenemos la pantalla de registro e inicio de sesión. Para registrarnos en la aplicación, utilizamos un nombre de usuario. Una vez registrados, tendremos que iniciar sesión. El registro no inicia sesión automáticamente, nos aparecerá un mensaje: "Cuenta creada. AHora inicia sesión.".
+En primer lugar tenemos la pantalla de registro e inicio de sesión. Para registrarnos en la aplicación, utilizamos un nombre de usuario. Una vez registrados, tendremos que iniciar sesión. El registro no inicia sesión automáticamente, nos aparecerá un mensaje: "Cuenta creada. Ahora inicia sesión.".
 
 ![Registro](./img/registro.png)
 
@@ -277,7 +277,7 @@ Nada más iniciar sesión, nos aparecerá el chat general de la aplicación, don
 
 Aquí tendremos varios mensajes predeterminados que explican las funcionalidades básicas de la aplicación. Desde aquí podemos enviar mensajes, editarlos o eliminarlos:
 
-![Envio, Edición y Borrado de mensajes](./img/envio-borrado-edicion.png)
+![Envío, Edición y Borrado de mensajes](./img/envio-borrado-edicion.png)
 
 La edición se realizará mediante un modal:
 
@@ -285,7 +285,10 @@ La edición se realizará mediante un modal:
 
 Además, al eliminar o editar un mensaje nos aparecerá una alerta efímera en la ventana de alertas de la esquina inferior derecha.
 
-![Alerta eliminación](./img/alerta-eliminacion.png)     ![Alerta edición](./img/alerta-edicion.png)
+<p align="center">
+  <img src="./img/alerta-eliminacion.png" width="300">
+  <img src="./img/alerta-edicion.png" width="300">
+</p>
 
 ### Mensajes privados
 
