@@ -1,7 +1,7 @@
 // Authentication Module
 window.auth = {
   mode: "login",
-  
+
   init: () => {
     const title = document.getElementById("auth-title");
     const btn = document.getElementById("auth-btn");

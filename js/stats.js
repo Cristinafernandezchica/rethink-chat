@@ -1,13 +1,12 @@
-// Statistics Module with MapReduce (Versión mejorada)
 window.stats = {
   modal: null,
   isLoading: false,
   refreshInterval: null,
   autoRefreshEnabled: true,
-  
-  init: function() {
+
+  init: function () {
     this.createStatsModal();
-    
+
     // Añadir botón al panel de admin
     const adminPanel = document.getElementById("admin-panel");
     if (adminPanel && !document.getElementById("admin-stats-btn")) {
@@ -19,10 +18,10 @@ window.stats = {
       adminPanel.appendChild(statsBtn);
     }
   },
-  
-  createStatsModal: function() {
+
+  createStatsModal: function () {
     if (document.getElementById("stats-modal")) return;
-    
+
     const modal = document.createElement("div");
     modal.id = "stats-modal";
     modal.className = "hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50";
@@ -55,17 +54,17 @@ window.stats = {
         </div>
       </div>
     `;
-    
+
     document.body.appendChild(modal);
-    
+
     document.getElementById("close-stats-modal").addEventListener("click", () => {
       this.hideStats();
     });
-    
+
     document.getElementById("refresh-stats").addEventListener("click", () => {
       this.loadStats(true);
     });
-    
+
     const autoToggle = document.getElementById("auto-refresh-toggle");
     if (autoToggle) {
       autoToggle.addEventListener("change", (e) => {
@@ -77,14 +76,13 @@ window.stats = {
         }
       });
     }
-    
-    // Cerrar al hacer clic fuera
+
     modal.addEventListener("click", (e) => {
       if (e.target === modal) this.hideStats();
     });
   },
-  
-  startAutoRefresh: function() {
+
+  startAutoRefresh: function () {
     if (this.refreshInterval) clearInterval(this.refreshInterval);
     this.refreshInterval = setInterval(() => {
       if (this.autoRefreshEnabled && !this.isLoading) {
@@ -92,67 +90,67 @@ window.stats = {
       }
     }, 30000); // Actualizar cada 30 segundos
   },
-  
-  stopAutoRefresh: function() {
+
+  stopAutoRefresh: function () {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
       this.refreshInterval = null;
     }
   },
-  
-  showStats: async function() {
+
+  showStats: async function () {
     const modal = document.getElementById("stats-modal");
     if (!modal) return;
-    
+
     modal.classList.remove("hidden");
     await this.loadStats(false);
     this.startAutoRefresh();
   },
-  
-  hideStats: function() {
+
+  hideStats: function () {
     const modal = document.getElementById("stats-modal");
     if (modal) modal.classList.add("hidden");
     this.stopAutoRefresh();
   },
-  
-  loadStats: async function(isRefresh = false) {
+
+  loadStats: async function (isRefresh = false) {
     const token = localStorage.getItem("token");
     const content = document.getElementById("stats-content");
     const refreshBtn = document.getElementById("refresh-stats");
-    
+
     if (!content) return;
-    
+
     if (!isRefresh) {
       this.isLoading = true;
     }
-    
+
     if (refreshBtn) {
       refreshBtn.disabled = true;
       refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Cargando...';
     }
-    
+
     try {
       // Cargar estadísticas principales
       const response = await fetch('/api/messages/stats/mapreduce', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       const result = await response.json();
-      
+
       if (!result.success) {
         content.innerHTML = `<div class="text-center py-8 text-red-500"><i class="fas fa-exclamation-triangle text-4xl"></i><p>${result.error || "Error al cargar estadísticas"}</p></div>`;
         return;
       }
-      
+
       // Cargar estadísticas en tiempo real
       const liveResponse = await fetch('/api/messages/stats/live', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       const liveResult = await liveResponse.json();
-      
+
       this.renderStats(result.stats, liveResult.realtime);
-      
+
       if (isRefresh) {
         // Mostrar notificación de actualización
         const notification = document.createElement('div');
@@ -161,7 +159,7 @@ window.stats = {
         document.body.appendChild(notification);
         setTimeout(() => notification.remove(), 2000);
       }
-      
+
     } catch (err) {
       console.error("Error cargando estadísticas:", err);
       content.innerHTML = `<div class="text-center py-8 text-red-500"><i class="fas fa-exclamation-triangle text-4xl"></i><p>Error de conexión al cargar estadísticas</p></div>`;
@@ -173,15 +171,15 @@ window.stats = {
       }
     }
   },
-  
-  renderStats: function(stats, realtime) {
+
+  renderStats: function (stats, realtime) {
     const content = document.getElementById("stats-content");
     if (!content) return;
-    
+
     const totalMessages = stats.globalMessages + stats.privateMessages;
     const globalPercent = Math.round((stats.globalMessages / totalMessages) * 100);
     const privatePercent = 100 - globalPercent;
-    
+
     const html = `
       <!-- Indicador de actualización en vivo -->
       <div class="bg-green-50 rounded-lg p-2 mb-4 text-center text-xs text-green-600 border border-green-200">
@@ -427,7 +425,7 @@ window.stats = {
         Mensajes analizados: ${totalMessages} (${stats.globalMessages} globales + ${stats.privateMessages} privados)
       </div>
     `;
-    
+
     content.innerHTML = html;
   }
 };

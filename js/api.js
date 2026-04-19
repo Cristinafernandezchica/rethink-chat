@@ -7,7 +7,7 @@ const getApiUrl = () => {
 
 const API_URL = getApiUrl();
 
-console.log('API_URL:', API_URL); // Para debug
+console.log('API_URL:', API_URL);
 
 window.api = {
   login: async (username, password) => {
@@ -40,7 +40,7 @@ window.api = {
     const data = await res.json();
     return { ok: res.ok, data };
   },
-  
+
   getAllUsers: async (token) => {
     const res = await fetch(`${API_URL}/messages/users`, {
       method: "GET",

@@ -1,12 +1,11 @@
-// Chat Module
 window.chat = {
   socket: null,
-  
+
   initSocket: () => {
     if (window.chat.socket) {
       window.chat.socket.disconnect();
     }
-    
+
     const token = localStorage.getItem("token");
     const username = localStorage.getItem("username");
 
@@ -37,7 +36,7 @@ window.chat = {
         const countEl = document.getElementById("online-count");
         if (countEl) countEl.innerText = onlineUsers;
       };
-      
+
       setInterval(updateOnlineCount, 1000);
     });
 
@@ -83,13 +82,13 @@ window.chat = {
     });
 
     socket.on("chat_history", (messages) => {
-    window.conversations.general = messages.map(m => ({
+      window.conversations.general = messages.map(m => ({
         id: m.id,
         from: m.username,
         fromUser: {
-        username: m.username,
-        avatar: m.avatar || m.username.charAt(0).toUpperCase(),
-        bio: m.bio || ""
+          username: m.username,
+          avatar: m.avatar || m.username.charAt(0).toUpperCase(),
+          bio: m.bio || ""
         },
         to: "general",
         text: m.text,
@@ -97,20 +96,20 @@ window.chat = {
         edited: m.edited || false,
         deleted: m.deleted || false,
         editHistory: m.editHistory || []
-    }));
-    if (window.currentChat === "general") {
+      }));
+      if (window.currentChat === "general") {
         window.ui.renderConversation("general");
-    }
+      }
     });
 
     socket.on("new_message", (msg) => {
-    window.conversations.general.push({
+      window.conversations.general.push({
         id: msg.id,
         from: msg.username,
         fromUser: {
-        username: msg.username,
-        avatar: msg.avatar || msg.username.charAt(0).toUpperCase(),
-        bio: msg.bio || ""
+          username: msg.username,
+          avatar: msg.avatar || msg.username.charAt(0).toUpperCase(),
+          bio: msg.bio || ""
         },
         to: "general",
         text: msg.text,
@@ -118,10 +117,10 @@ window.chat = {
         edited: msg.edited || false,
         deleted: msg.deleted || false,
         editHistory: msg.editHistory || []
-    });
-    if (window.currentChat === "general") {
+      });
+      if (window.currentChat === "general") {
         window.ui.renderConversation("general");
-    }
+      }
     });
 
     socket.on("private_history", (convs) => {
@@ -153,20 +152,20 @@ window.chat = {
       const currentUser = localStorage.getItem("username");
       const other = msg.from === currentUser ? msg.to : msg.from;
       window.ensureConversation(other);
-      
+
       const alreadyExists = msg.id && window.conversations[other].some(m => m.id === msg.id);
       if (alreadyExists) return;
-      
+
       window.conversations[other].push(msg);
       if (!window.uiState.users.has(other)) {
         window.uiState.users.set(other, { online: false, hasUnread: false });
       }
-      
+
       if (msg.to === currentUser && msg.read === false) {
         if (!window.unreadCounts) window.unreadCounts = {};
         window.unreadCounts[other] = (window.unreadCounts[other] || 0) + 1;
       }
-      
+
       if (window.currentChat !== other) {
         window.ui.addAlert({
           type: "message",
@@ -175,7 +174,7 @@ window.chat = {
         });
         window.uiState.users.get(other).hasUnread = true;
       }
-      
+
       window.ui.renderConversationList();
       if (window.currentChat === other) {
         window.uiState.users.get(other).hasUnread = false;
@@ -198,19 +197,19 @@ window.chat = {
     window.chat.setupMessageHandlers(socket, username);
 
     socket.on("message_edited", (message) => {
-        window.ui.updateMessageInUI(message.id, message);
+      window.ui.updateMessageInUI(message.id, message);
     });
 
     socket.on("message_deleted", (message) => {
-        window.ui.updateMessageInUI(message.id, message);
+      window.ui.updateMessageInUI(message.id, message);
     });
 
     socket.on("private_message_edited", (message) => {
-        window.ui.updateMessageInUI(message.id, message);
+      window.ui.updateMessageInUI(message.id, message);
     });
 
     socket.on("private_message_deleted", (message) => {
-        window.ui.updateMessageInUI(message.id, message);
+      window.ui.updateMessageInUI(message.id, message);
     });
   },
 
@@ -234,7 +233,7 @@ window.chat = {
       console.error("Error cargando usuarios:", e);
     }
   },
-  
+
 
   loadUnreadCounts: async (token) => {
     try {
@@ -251,22 +250,22 @@ window.chat = {
   setupMessageHandlers: (socket, username) => {
     const sendBtn = document.getElementById("chat-send");
     const input = document.getElementById("chat-input");
-    
+
     if (sendBtn) {
       sendBtn.addEventListener("click", () => {
         const text = input.value.trim();
         if (!text) return;
-        
+
         if (window.currentChat === "general") {
           socket.emit("send_message", { text, username });
         } else {
           socket.emit("private_message", { from: username, to: window.currentChat, text });
         }
-        
+
         input.value = "";
       });
     }
-    
+
     if (input) {
       input.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -274,7 +273,7 @@ window.chat = {
           sendBtn?.click();
         }
       });
-      
+
       let typingTimeout = null;
       input.addEventListener("input", () => {
         if (window.currentChat === "general") return;
@@ -293,14 +292,14 @@ window.chat = {
     const statusText = isGeneral ? "Grupo público" : (isOnline ? "En línea" : "Desconectado");
     const statusColor = isOnline ? "text-green-500" : "text-gray-400";
     document.getElementById("chat-status").innerHTML = `<span class="${statusColor}">${statusText}</span>`;
-    
+
     if (!isGeneral && unreadCount > 0) {
       const token = localStorage.getItem("token");
       await window.api.markMessagesAsRead(token, chatId);
       if (window.unreadCounts) delete window.unreadCounts[chatId];
       window.ui.renderConversationList();
     }
-    
+
     window.ui.renderConversation(chatId);
     window.ui.highlightConversation(chatId);
   }
