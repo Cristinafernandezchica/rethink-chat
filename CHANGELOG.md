@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.2](https://github.com/Cristinafernandezchica/rethink-chat/compare/v1.0.1...v1.0.2) (2026-04-19)
+
+
+### Features
+
+* add logo image to the authentication screen ([dc5f37b](https://github.com/Cristinafernandezchica/rethink-chat/commit/dc5f37b483af2ac2b3f93835236dbba759fddb71))
+
 ### 1.0.1 (2026-04-19)
 
 
