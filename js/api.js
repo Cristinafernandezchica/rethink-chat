@@ -87,7 +87,7 @@ window.api = {
     return { ok: res.ok, data };
   },
 
-  // Editar mensaje global
+  // Editar mensaje global - En desuso, se cambió a WebSocket
   editMessage: async (token, messageId, newText) => {
     const res = await fetch(`${API_URL}/messages/edit-message/${messageId}`, {
       method: "PUT",

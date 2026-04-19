@@ -472,9 +472,11 @@ export function registerSocketHandlers(io, conn) {
           }, { returnChanges: true })
           .run(conn);
 
+          /*
         if (updatedMessage.changes && updatedMessage.changes[0]) {
           io.emit("message_edited", updatedMessage.changes[0].new_val);
         }
+          */
       } catch (err) {
         console.error("Error editando mensaje por socket:", err);
         socket.emit("error", { message: "Error al editar mensaje" });
@@ -523,6 +525,8 @@ export function registerSocketHandlers(io, conn) {
           }, { returnChanges: true })
           .run(conn);
 
+      /*
+      // EN CASO DE NO TENER CHANGEFEED DESCOMENTAR
         if (updatedMessage.changes && updatedMessage.changes[0]) {
           const newMessage = updatedMessage.changes[0].new_val;
           const sockets = [...io.sockets.sockets.values()];
@@ -532,6 +536,7 @@ export function registerSocketHandlers(io, conn) {
             }
           });
         }
+      */
       } catch (err) {
         console.error("Error editando mensaje privado:", err);
         socket.emit("error", { message: "Error al editar mensaje" });
@@ -569,9 +574,12 @@ export function registerSocketHandlers(io, conn) {
           }, { returnChanges: true })
           .run(conn);
 
+      /*
+      // EN CASO DE NO TENER CHAGEFEED DESCOMENTAR
         if (updatedMessage.changes && updatedMessage.changes[0]) {
           io.emit("message_deleted", updatedMessage.changes[0].new_val);
         }
+      */
       } catch (err) {
         console.error("Error borrando mensaje:", err);
         socket.emit("error", { message: "Error al borrar mensaje" });
@@ -609,6 +617,8 @@ export function registerSocketHandlers(io, conn) {
           }, { returnChanges: true })
           .run(conn);
 
+      /*
+      // EN CASO DE NO TENER CHAGEFEED DESCOMENTAR
         if (updatedMessage.changes && updatedMessage.changes[0]) {
           const newMessage = updatedMessage.changes[0].new_val;
           const sockets = [...io.sockets.sockets.values()];
@@ -618,6 +628,7 @@ export function registerSocketHandlers(io, conn) {
             }
           });
         }
+      */
       } catch (err) {
         console.error("Error borrando mensaje privado:", err);
         socket.emit("error", { message: "Error al borrar mensaje" });
@@ -691,13 +702,31 @@ export function registerSocketHandlers(io, conn) {
         return;
       }
 
-      if (change.new_val) {
-        const message = change.new_val;
-        const sockets = [...io.sockets.sockets.values()];
+      const oldVal = change.old_val;
+      const newVal = change.new_val;
 
+      if (!newVal) return;
+
+      const sockets = [...io.sockets.sockets.values()];
+      
+      if (oldVal && oldVal.text !== newVal.text && newVal.edited === true) {
         sockets.forEach(socket => {
-          if (socket.username === message.from || socket.username === message.to) {
-            socket.emit("private_message", message);
+          if (socket.username === newVal.from || socket.username === newVal.to) {
+            socket.emit("private_message_edited", newVal);
+          }
+        });
+      } 
+      else if (oldVal && !oldVal.deleted && newVal.deleted === true) {
+        sockets.forEach(socket => {
+          if (socket.username === newVal.from || socket.username === newVal.to) {
+            socket.emit("private_message_deleted", newVal);
+          }
+        });
+      }
+      else if (!oldVal) {
+        sockets.forEach(socket => {
+          if (socket.username === newVal.from || socket.username === newVal.to) {
+            socket.emit("private_message", newVal);
           }
         });
       }

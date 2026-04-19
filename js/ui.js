@@ -321,7 +321,7 @@ window.ui = {
       return;
     }
 
-    // Usar socket directamente en lugar de API REST
+    // Usamos socket directamente en lugar de API REST
     if (window.chat?.socket) {
       if (type === "global") {
         window.chat.socket.emit("edit_message", { messageId, newText });

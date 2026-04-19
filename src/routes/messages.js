@@ -217,7 +217,7 @@ router.get("/unread-counts", verifyTokenMiddleware, async (req, res) => {
   }
 });
 
-// EDITAR MENSAJE GENERAL
+// EDITAR MENSAJE GENERAL - En desuso, se cambió a WebSockets
 router.put("/edit-message/:messageId", verifyTokenMiddleware, async (req, res) => {
   try {
     const conn = req.app.get("dbConn");
