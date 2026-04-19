@@ -5,7 +5,7 @@ import { verifyToken } from "./auth.js";
 async function getSearchResults(conn, searchTerm, currentUser) {
   const db = process.env.RETHINK_DB;
   const results = [];
-  
+
   // Buscar en mensajes globales
   const globalCursor = await r.db(db)
     .table("messages")
@@ -14,7 +14,7 @@ async function getSearchResults(conn, searchTerm, currentUser) {
     .orderBy(r.desc("createdAt"))
     .limit(30)
     .run(conn);
-  
+
   const globalResults = await globalCursor.toArray();
   results.push(...globalResults.map(msg => ({
     id: msg.id,
@@ -24,7 +24,7 @@ async function getSearchResults(conn, searchTerm, currentUser) {
     chatType: "global",
     chatName: "Chat General"
   })));
-  
+
   // Buscar en mensajes privados
   const privateCursor = await r.db(db)
     .table("private_messages")
@@ -34,9 +34,9 @@ async function getSearchResults(conn, searchTerm, currentUser) {
     .orderBy(r.desc("createdAt"))
     .limit(30)
     .run(conn);
-  
+
   const privateResults = await privateCursor.toArray();
-  
+
   // Agrupar por conversación
   const convMap = new Map();
   privateResults.forEach(msg => {
@@ -54,7 +54,7 @@ async function getSearchResults(conn, searchTerm, currentUser) {
       chatName: otherUser
     });
   });
-  
+
   for (const [otherUser, messages] of convMap) {
     results.push({
       chatType: "private",
@@ -62,7 +62,7 @@ async function getSearchResults(conn, searchTerm, currentUser) {
       messages: messages.slice(0, 10)
     });
   }
-  
+
   return results;
 }
 
@@ -209,7 +209,7 @@ export function registerSocketHandlers(io, conn) {
             return;
           }
           currentSearchSubscription = cursor;
-          
+
           cursor.each(async (err, change) => {
             if (err) {
               console.error("Error en cambio de messages:", err);
@@ -217,13 +217,13 @@ export function registerSocketHandlers(io, conn) {
             }
             const newMsg = change.new_val;
             const oldMsg = change.old_val;
-            
+
             // Verificar si el mensaje coincide con la búsqueda actual
             const matches = (msg) => {
               if (!msg || !msg.text || msg.deleted) return false;
               return msg.text.toLowerCase().includes(lowerSearchTerm);
             };
-            
+
             if ((newMsg && matches(newMsg)) || (oldMsg && matches(oldMsg))) {
               await emitUpdate();
             }
@@ -239,23 +239,23 @@ export function registerSocketHandlers(io, conn) {
             console.error("Error en changefeed de private_messages:", err);
             return;
           }
-          
+
           cursor.each(async (err, change) => {
             if (err) {
               console.error("Error en cambio de private_messages:", err);
               return;
             }
             const newMsg = change.new_val;
-            
+
             const matches = (msg) => {
               if (!msg || !msg.text || msg.deleted) return false;
               return msg.text.toLowerCase().includes(lowerSearchTerm);
             };
-            
+
             const canAccess = (msg) => {
               return msg && (msg.from === currentUser || msg.to === currentUser);
             };
-            
+
             if (newMsg && canAccess(newMsg) && matches(newMsg)) {
               await emitUpdate();
             }
@@ -340,30 +340,30 @@ export function registerSocketHandlers(io, conn) {
 
     socket.on("join_room", async (roomId) => {
       if (!socket.username) return;
-      
+
       const memberCheck = await r.db(db)
         .table("room_members")
         .filter({ roomId, username: socket.username })
         .run(conn);
-      
+
       const isMember = (await memberCheck.toArray()).length > 0;
-      
+
       if (isMember) {
         if (socket.currentRoom) {
           socket.leave(`room:${socket.currentRoom}`);
         }
-        
+
         socket.currentRoom = roomId;
         socket.join(`room:${roomId}`);
         console.log(`${socket.username} se unió a la sala ${roomId}`);
-        
+
         const history = await r.db(db)
           .table("room_messages")
           .filter({ roomId })
           .orderBy(r.asc("createdAt"))
           .limit(100)
           .run(conn);
-        
+
         const messages = await history.toArray();
         socket.emit("room_history", { roomId, messages });
       }
@@ -371,21 +371,21 @@ export function registerSocketHandlers(io, conn) {
 
     socket.on("room_message", async (data) => {
       const { roomId, text } = data;
-      
+
       if (!socket.username || !roomId || !text) return;
-      
+
       const memberCheck = await r.db(db)
         .table("room_members")
         .filter({ roomId, username: socket.username })
         .run(conn);
-      
+
       const isMember = (await memberCheck.toArray()).length > 0;
-      
+
       if (!isMember) {
         socket.emit("error", { message: "No eres miembro de esta sala" });
         return;
       }
-      
+
       const message = {
         id: r.uuid(),
         roomId,
@@ -395,9 +395,9 @@ export function registerSocketHandlers(io, conn) {
         edited: false,
         deleted: false
       };
-      
+
       await r.db(db).table("room_messages").insert(message).run(conn);
-      
+
       io.to(`room:${roomId}`).emit("room_message", message);
     });
 
@@ -433,7 +433,7 @@ export function registerSocketHandlers(io, conn) {
     // EDITAR MENSAJE GENERAL
     socket.on("edit_message", async (data) => {
       const { messageId, newText } = data;
-      
+
       try {
         const message = await r.db(db)
           .table("messages")
@@ -444,7 +444,7 @@ export function registerSocketHandlers(io, conn) {
           socket.emit("error", { message: "Mensaje no encontrado" });
           return;
         }
-        
+
         if (message.username !== socket.username && socket.role !== "admin") {
           socket.emit("error", { message: "No autorizado" });
           return;
@@ -471,10 +471,12 @@ export function registerSocketHandlers(io, conn) {
             originalText: message.originalText || message.text
           }, { returnChanges: true })
           .run(conn);
-        
+
+          /*
         if (updatedMessage.changes && updatedMessage.changes[0]) {
           io.emit("message_edited", updatedMessage.changes[0].new_val);
         }
+          */
       } catch (err) {
         console.error("Error editando mensaje por socket:", err);
         socket.emit("error", { message: "Error al editar mensaje" });
@@ -484,7 +486,7 @@ export function registerSocketHandlers(io, conn) {
     // EDITAR MENSAJE PRIVADO
     socket.on("edit_private_message", async (data) => {
       const { messageId, newText } = data;
-      
+
       try {
         const message = await r.db(db)
           .table("private_messages")
@@ -495,7 +497,7 @@ export function registerSocketHandlers(io, conn) {
           socket.emit("error", { message: "Mensaje no encontrado" });
           return;
         }
-        
+
         if (message.from !== socket.username && socket.role !== "admin") {
           socket.emit("error", { message: "No autorizado" });
           return;
@@ -522,7 +524,9 @@ export function registerSocketHandlers(io, conn) {
             originalText: message.originalText || message.text
           }, { returnChanges: true })
           .run(conn);
-        
+
+      /*
+      // EN CASO DE NO TENER CHANGEFEED DESCOMENTAR
         if (updatedMessage.changes && updatedMessage.changes[0]) {
           const newMessage = updatedMessage.changes[0].new_val;
           const sockets = [...io.sockets.sockets.values()];
@@ -532,6 +536,7 @@ export function registerSocketHandlers(io, conn) {
             }
           });
         }
+      */
       } catch (err) {
         console.error("Error editando mensaje privado:", err);
         socket.emit("error", { message: "Error al editar mensaje" });
@@ -541,7 +546,7 @@ export function registerSocketHandlers(io, conn) {
     // BORRAR MENSAJE GENERAL
     socket.on("delete_message", async (data) => {
       const { messageId } = data;
-      
+
       try {
         const message = await r.db(db)
           .table("messages")
@@ -568,10 +573,13 @@ export function registerSocketHandlers(io, conn) {
             text: "[Mensaje eliminado]"
           }, { returnChanges: true })
           .run(conn);
-        
+
+      /*
+      // EN CASO DE NO TENER CHAGEFEED DESCOMENTAR
         if (updatedMessage.changes && updatedMessage.changes[0]) {
           io.emit("message_deleted", updatedMessage.changes[0].new_val);
         }
+      */
       } catch (err) {
         console.error("Error borrando mensaje:", err);
         socket.emit("error", { message: "Error al borrar mensaje" });
@@ -581,7 +589,7 @@ export function registerSocketHandlers(io, conn) {
     // BORRAR MENSAJE PRIVADO
     socket.on("delete_private_message", async (data) => {
       const { messageId } = data;
-      
+
       try {
         const message = await r.db(db)
           .table("private_messages")
@@ -608,7 +616,9 @@ export function registerSocketHandlers(io, conn) {
             text: "[Mensaje eliminado]"
           }, { returnChanges: true })
           .run(conn);
-        
+
+      /*
+      // EN CASO DE NO TENER CHAGEFEED DESCOMENTAR
         if (updatedMessage.changes && updatedMessage.changes[0]) {
           const newMessage = updatedMessage.changes[0].new_val;
           const sockets = [...io.sockets.sockets.values()];
@@ -618,6 +628,7 @@ export function registerSocketHandlers(io, conn) {
             }
           });
         }
+      */
       } catch (err) {
         console.error("Error borrando mensaje privado:", err);
         socket.emit("error", { message: "Error al borrar mensaje" });
@@ -691,13 +702,31 @@ export function registerSocketHandlers(io, conn) {
         return;
       }
 
-      if (change.new_val) {
-        const message = change.new_val;
-        const sockets = [...io.sockets.sockets.values()];
+      const oldVal = change.old_val;
+      const newVal = change.new_val;
 
+      if (!newVal) return;
+
+      const sockets = [...io.sockets.sockets.values()];
+      
+      if (oldVal && oldVal.text !== newVal.text && newVal.edited === true) {
         sockets.forEach(socket => {
-          if (socket.username === message.from || socket.username === message.to) {
-            socket.emit("private_message", message);
+          if (socket.username === newVal.from || socket.username === newVal.to) {
+            socket.emit("private_message_edited", newVal);
+          }
+        });
+      } 
+      else if (oldVal && !oldVal.deleted && newVal.deleted === true) {
+        sockets.forEach(socket => {
+          if (socket.username === newVal.from || socket.username === newVal.to) {
+            socket.emit("private_message_deleted", newVal);
+          }
+        });
+      }
+      else if (!oldVal) {
+        sockets.forEach(socket => {
+          if (socket.username === newVal.from || socket.username === newVal.to) {
+            socket.emit("private_message", newVal);
           }
         });
       }
