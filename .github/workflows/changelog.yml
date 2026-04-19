@@ -1,0 +1,38 @@
+name: Auto Changelog
+
+on:
+  push:
+    branches:
+      - master
+
+
+permissions:
+  contents: write
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Configure Git identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install standard-version
+        run: npm install -g standard-version
+
+      - name: Generate changelog
+        run: standard-version --release-as patch
+
+      - name: Push changes
+        run: |
+          git push --follow-tags origin HEAD
