@@ -136,6 +136,7 @@ router.get("/unread-counts", verifyTokenMiddleware, async (req, res) => {
     const conn = req.app.get("dbConn");
     const currentUser = req.user.username;
 
+    // Consulta a la base de datos los mensajes (privados) no leídos
     const cursor = await r.db(db)
       .table("private_messages")
       .filter({ to: currentUser, read: false })
