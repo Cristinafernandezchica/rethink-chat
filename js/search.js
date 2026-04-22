@@ -1,10 +1,9 @@
-// Search Module - Versión con WebSockets en tiempo real y scroll a mensaje
 window.search = {
   currentSubscription: null,
   currentQuery: "",
-  resultsVisible: true, // Controlar si los resultados están visibles
-  
-  init: function() {
+  resultsVisible: true,
+
+  init: function () {
     const searchInput = document.getElementById("search-input");
     const searchClear = document.getElementById("search-clear");
     const searchResults = document.getElementById("search-results");
@@ -12,11 +11,11 @@ window.search = {
     const self = this;
 
     if (searchInput) {
-      searchInput.addEventListener("input", function() {
+      searchInput.addEventListener("input", function () {
         clearTimeout(searchTimeout);
         const query = searchInput.value.trim();
         self.currentQuery = query;
-        
+
         if (query.length < 2) {
           searchResults.classList.add("hidden");
           searchClear.classList.add("hidden");
@@ -28,19 +27,18 @@ window.search = {
           }
           return;
         }
-        
+
         searchClear.classList.remove("hidden");
         self.resultsVisible = true;
-        
-        // Debounce para no saturar el servidor
-        searchTimeout = setTimeout(function() {
+
+        searchTimeout = setTimeout(function () {
           self.performSearch(query);
         }, 500);
       });
     }
 
     if (searchClear) {
-      searchClear.addEventListener("click", function() {
+      searchClear.addEventListener("click", function () {
         searchInput.value = "";
         searchResults.classList.add("hidden");
         searchClear.classList.add("hidden");
@@ -56,51 +54,50 @@ window.search = {
     }
   },
 
-  performSearch: function(query) {
+  performSearch: function (query) {
     if (!window.chat?.socket) {
       console.error("Socket no disponible");
       return;
     }
-    
-    // Configurar el manejador de resultados si no está ya configurado
+
     if (!this.currentSubscription) {
       window.chat.socket.on("search_results", this.handleResults.bind(this));
       this.currentSubscription = true;
     }
-    
+
     console.log("Buscando:", query);
     window.chat.socket.emit("subscribe_search", query);
   },
 
-  handleResults: function(data) {
+  handleResults: function (data) {
     // Solo mostrar resultados si la consulta actual coincide
     if (data.searchTerm !== this.currentQuery) {
       return;
     }
-    
+
     console.log("Resultados recibidos:", data.results.length);
     this.displayResults(data.results, data.searchTerm);
   },
 
-  displayResults: function(results, query) {
+  displayResults: function (results, query) {
     const searchResults = document.getElementById("search-results");
     if (!searchResults) return;
-    
+
     if (!this.resultsVisible) return;
-    
+
     if (results.length === 0) {
       searchResults.innerHTML = `<p class="text-sm text-gray-500 p-2">🔍 No se encontraron resultados para "${escapeHtml(query)}"</p>`;
       searchResults.classList.remove("hidden");
       return;
     }
-    
+
     let html = `<div class="text-xs text-gray-500 mb-2 p-1 border-b flex justify-between items-center">
                   <span>✨ Resultados en tiempo real para "${escapeHtml(query)}"</span>
                   <button id="close-search-results" class="text-gray-400 hover:text-gray-600 text-xs px-2 py-1 rounded hover:bg-gray-100">
                     <i class="fas fa-times"></i> Cerrar
                   </button>
                 </div>`;
-    
+
     results.forEach(result => {
       if (result.chatType === "global") {
         html += `
@@ -143,13 +140,13 @@ window.search = {
         html += `</div></div>`;
       }
     });
-    
+
     // Añadir indicador de "en vivo"
     html += `<div class="text-center text-[10px] text-green-500 mt-2 pb-1">Actualizaciones en tiempo real activas</div>`;
-    
+
     searchResults.innerHTML = html;
     searchResults.classList.remove("hidden");
-    
+
     // Event listener para cerrar resultados
     const closeBtn = document.getElementById("close-search-results");
     if (closeBtn) {
@@ -158,26 +155,26 @@ window.search = {
         this.resultsVisible = false;
       });
     }
-    
+
     // Añadir event listeners a los resultados de mensajes individuales
     const self = this;
-    document.querySelectorAll(".search-result-item, .search-result-message").forEach(function(el) {
-      el.addEventListener("click", async function(e) {
+    document.querySelectorAll(".search-result-item, .search-result-message").forEach(function (el) {
+      el.addEventListener("click", async function (e) {
         e.stopPropagation();
         const chatId = this.dataset.chat;
         const messageId = this.dataset.messageId;
         const messageType = this.dataset.messageType;
-        
+
         if (chatId && messageId) {
           // Cambiar al chat correspondiente
           const isGeneral = chatId === "general";
           const displayName = isGeneral ? "Chat general" : chatId;
-          
+
           // Seleccionar la conversación
           if (window.chat?.selectConversation) {
             await window.chat.selectConversation(chatId, displayName, false, isGeneral, 0);
           }
-          
+
           // Esperar un momento para que se rendericen los mensajes
           setTimeout(() => {
             self.scrollToMessage(messageId, messageType);
@@ -185,15 +182,15 @@ window.search = {
         }
       });
     });
-    
+
     // Event listeners para las cabeceras de conversación (expanden/colapsan)
-    document.querySelectorAll(".search-result-conversation").forEach(function(el) {
+    document.querySelectorAll(".search-result-conversation").forEach(function (el) {
       const header = el.querySelector('.bg-gray-50');
       const messagesContainer = el.querySelector('.pl-4');
-      
+
       if (header && messagesContainer) {
         header.style.cursor = 'pointer';
-        header.addEventListener('click', function(e) {
+        header.addEventListener('click', function (e) {
           e.stopPropagation();
           const isHidden = messagesContainer.style.display === 'none';
           messagesContainer.style.display = isHidden ? 'block' : 'none';
@@ -202,23 +199,23 @@ window.search = {
     });
   },
 
-  scrollToMessage: function(messageId, messageType) {
+  scrollToMessage: function (messageId, messageType) {
     // Buscar el elemento del mensaje en el DOM
     const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
-    
+
     if (messageElement) {
       // Scroll suave hasta el mensaje
-      messageElement.scrollIntoView({ 
-        behavior: 'smooth', 
+      messageElement.scrollIntoView({
+        behavior: 'smooth',
         block: 'center',
         inline: 'nearest'
       });
-      
+
       // Añadir un efecto de resaltado temporal
       const bubble = messageElement.querySelector('.max-w-\\[70\\%\\]');
       if (bubble) {
         bubble.classList.add('ring-2', 'ring-yellow-400', 'ring-offset-2', 'transition-all', 'duration-300');
-        
+
         // Quitar el resaltado después de 3 segundos
         setTimeout(() => {
           bubble.classList.remove('ring-2', 'ring-yellow-400', 'ring-offset-2');
@@ -227,12 +224,12 @@ window.search = {
     } else {
       // Si el mensaje no está en el DOM (quizás no cargado), recargar la conversación
       console.log("Mensaje no encontrado en el DOM, recargando conversación...");
-      
+
       // Forzar recarga de la conversación actual
       const currentChat = window.currentChat;
       if (currentChat && window.ui?.renderConversation) {
         window.ui.renderConversation(currentChat);
-        
+
         // Intentar de nuevo después de la recarga
         setTimeout(() => {
           const retryElement = document.querySelector(`[data-message-id="${messageId}"]`);
@@ -251,27 +248,27 @@ window.search = {
     }
   },
 
-  highlightText: function(text, query) {
+  highlightText: function (text, query) {
     if (!query || !text) return escapeHtml(text);
     const regex = new RegExp(`(${window.search.escapeRegex(query)})`, "gi");
     return escapeHtml(text).replace(regex, `<mark class="bg-yellow-200 text-gray-900 px-0.5 rounded">$1</mark>`);
   },
 
-  escapeRegex: function(string) {
+  escapeRegex: function (string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   },
-  
+
   // Función para ocultar resultados manualmente
-  hideResults: function() {
+  hideResults: function () {
     const searchResults = document.getElementById("search-results");
     if (searchResults) {
       searchResults.classList.add("hidden");
       this.resultsVisible = false;
     }
   },
-  
+
   // Función para mostrar resultados nuevamente
-  showResults: function() {
+  showResults: function () {
     if (this.currentQuery && this.currentQuery.length >= 2) {
       this.resultsVisible = true;
       this.performSearch(this.currentQuery);

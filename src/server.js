@@ -40,10 +40,10 @@ app.get('/health', (req, res) => {
 // Conectar DB y arrancar sockets
 connectDB().then(async (conn) => {
   app.set("dbConn", conn);
-  
+
   // Inicializar tablas automáticamente
   await initDatabase();
-  
+
   // Sockets reciben la conexión
   registerSocketHandlers(io, conn);
 

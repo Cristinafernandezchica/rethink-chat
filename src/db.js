@@ -24,7 +24,7 @@ export async function connectDB() {
     console.log("⚠️  Skipping database connection during build phase");
     return null;
   }
-  
+
   if (connection) return connection;
 
   const host = process.env.RETHINK_HOST;

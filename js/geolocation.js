@@ -6,15 +6,15 @@ window.geolocation = {
   markers: {},
   currentPosition: null,
   updateInterval: null,
-  
-  init: function() {
+
+  init: function () {
     this.createModal();
     this.addButtonToUI();
   },
-  
-  createModal: function() {
+
+  createModal: function () {
     if (document.getElementById("geo-modal")) return;
-    
+
     const modal = document.createElement("div");
     modal.id = "geo-modal";
     modal.className = "hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50";
@@ -70,22 +70,22 @@ window.geolocation = {
         </div>
       </div>
     `;
-    
+
     document.body.appendChild(modal);
-    
+
     // Event listeners
     document.getElementById("close-geo-modal").addEventListener("click", () => this.hideModal());
     document.getElementById("share-location-btn").addEventListener("click", () => this.startSharing());
     document.getElementById("stop-sharing-btn").addEventListener("click", () => this.stopSharing());
     document.getElementById("find-nearby-btn").addEventListener("click", () => this.findNearby());
     document.getElementById("refresh-users-btn").addEventListener("click", () => this.loadAllUsers());
-    
+
     modal.addEventListener("click", (e) => {
       if (e.target === modal) this.hideModal();
     });
   },
-  
-  addButtonToUI: function() {
+
+  addButtonToUI: function () {
     // Añadir botón al sidebar de usuarios
     const usersHeader = document.querySelector("#app-screen .border-r .p-4.border-b");
     if (usersHeader && !document.getElementById("geo-toggle-btn")) {
@@ -95,7 +95,7 @@ window.geolocation = {
       geoBtn.innerHTML = '<i class="fas fa-map-marked-alt text-xl"></i>';
       geoBtn.title = "Ver mapa de usuarios";
       geoBtn.onclick = () => this.showModal();
-      
+
       // Insertar junto al logout button
       const logoutBtn = document.getElementById("logout-btn");
       if (logoutBtn) {
@@ -103,15 +103,15 @@ window.geolocation = {
       }
     }
   },
-  
-  showModal: function() {
+
+  showModal: function () {
     const modal = document.getElementById("geo-modal");
     if (!modal) return;
-    
+
     modal.classList.remove("hidden");
     this.loadMap();
     this.loadAllUsers();
-    
+
     // Iniciar actualización periódica de usuarios en el mapa (cada 10 segundos)
     if (this.updateInterval) clearInterval(this.updateInterval);
     this.updateInterval = setInterval(() => {
@@ -120,47 +120,47 @@ window.geolocation = {
       }
     }, 10000);
   },
-  
-  hideModal: function() {
+
+  hideModal: function () {
     const modal = document.getElementById("geo-modal");
     if (modal) modal.classList.add("hidden");
-    
+
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
       this.updateInterval = null;
     }
   },
-  
-  loadMap: function() {
+
+  loadMap: function () {
     // Cargar Leaflet (biblioteca de mapas gratuita)
     if (document.querySelector("#leaflet-css")) {
       this.initMap();
       return;
     }
-    
+
     const link = document.createElement("link");
     link.id = "leaflet-css";
     link.rel = "stylesheet";
     link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
     document.head.appendChild(link);
-    
+
     const script = document.createElement("script");
     script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
     script.onload = () => this.initMap();
     document.head.appendChild(script);
   },
-  
-  initMap: function() {
+
+  initMap: function () {
     const container = document.getElementById("map-container");
     if (!container) return;
-    
+
     // Centro por defecto (Madrid)
     this.map = L.map(container).setView([40.4168, -3.7038], 13);
-    
+
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors'
     }).addTo(this.map);
-    
+
     // Intentar obtener la ubicación actual del usuario
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -171,25 +171,25 @@ window.geolocation = {
       );
     }
   },
-  
-  startSharing: function() {
+
+  startSharing: function () {
     if (!navigator.geolocation) {
       alert("Tu navegador no soporta geolocalización");
       return;
     }
-    
+
     if (this.isSharing) {
       alert("Ya estás compartiendo tu ubicación");
       return;
     }
-    
+
     this.isSharing = true;
-    
+
     // Función para enviar ubicación
     const sendLocation = async (position) => {
       const { latitude, longitude } = position.coords;
       this.currentPosition = { lat: latitude, lng: longitude };
-      
+
       const token = localStorage.getItem("token");
       try {
         const response = await fetch("/api/messages/location/update", {
@@ -200,7 +200,7 @@ window.geolocation = {
           },
           body: JSON.stringify({ lat: latitude, lng: longitude })
         });
-        
+
         const data = await response.json();
         if (data.success) {
           console.log("Ubicación enviada correctamente");
@@ -211,7 +211,7 @@ window.geolocation = {
         console.error("Error enviando ubicación:", err);
       }
     };
-    
+
     // Enviar ubicación inmediatamente
     navigator.geolocation.getCurrentPosition(
       sendLocation,
@@ -222,12 +222,12 @@ window.geolocation = {
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
-    
+
     // Luego, actualizar cada 30 segundos (no cada cambio para evitar spam)
     if (this.watchId) {
       navigator.geolocation.clearWatch(this.watchId);
     }
-    
+
     this.watchId = navigator.geolocation.watchPosition(
       sendLocation,
       (error) => {
@@ -235,21 +235,21 @@ window.geolocation = {
       },
       { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
     );
-    
+
     document.getElementById("share-location-btn").classList.add("hidden");
     document.getElementById("stop-sharing-btn").classList.remove("hidden");
-    
+
     window.ui.addAlert({ text: "📍 Compartiendo tu ubicación...", ephemeral: true });
   },
-  
-  stopSharing: async function() {
+
+  stopSharing: async function () {
     if (this.watchId) {
       navigator.geolocation.clearWatch(this.watchId);
       this.watchId = null;
     }
-    
+
     this.isSharing = false;
-    
+
     const token = localStorage.getItem("token");
     try {
       await fetch("/api/messages/location/delete", {
@@ -259,23 +259,23 @@ window.geolocation = {
     } catch (err) {
       console.error("Error al dejar de compartir:", err);
     }
-    
+
     if (this.markers.own) {
       this.map.removeLayer(this.markers.own);
       delete this.markers.own;
     }
-    
+
     document.getElementById("share-location-btn").classList.remove("hidden");
     document.getElementById("stop-sharing-btn").classList.add("hidden");
-    
+
     window.ui.addAlert({ text: "📍 Has dejado de compartir tu ubicación", ephemeral: true });
-    
+
     this.loadAllUsers();
   },
-  
-  updateOwnMarker: function(lat, lng) {
+
+  updateOwnMarker: function (lat, lng) {
     if (!this.map) return;
-    
+
     if (this.markers.own) {
       this.markers.own.setLatLng([lat, lng]);
     } else {
@@ -289,31 +289,31 @@ window.geolocation = {
       this.markers.own.bindPopup("<b>Tú</b><br>Estás aquí").openPopup();
     }
   },
-  
-  loadAllUsers: async function() {
+
+  loadAllUsers: async function () {
     const token = localStorage.getItem("token");
-    
+
     try {
       const response = await fetch("/api/messages/location/all", {
         headers: { "Authorization": `Bearer ${token}` }
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success && data.users) {
         // Limpiar usuarios duplicados por username
         const uniqueUsers = [];
         const seenUsernames = new Set();
-        
+
         for (const user of data.users) {
           if (!seenUsernames.has(user.username)) {
             seenUsernames.add(user.username);
             uniqueUsers.push(user);
           }
         }
-        
+
         this.updateUserMarkers(uniqueUsers);
-        
+
         // Actualizar contador en la UI
         const nearbyDiv = document.getElementById("nearby-results");
         if (nearbyDiv && uniqueUsers.length > 0) {
@@ -327,10 +327,10 @@ window.geolocation = {
       console.error("Error cargando usuarios:", err);
     }
   },
-  
-  updateUserMarkers: function(users) {
+
+  updateUserMarkers: function (users) {
     if (!this.map) return;
-    
+
     // Eliminar marcadores que ya no existen
     Object.keys(this.markers).forEach(key => {
       if (key !== "own" && !users.find(u => u.username === key)) {
@@ -338,7 +338,7 @@ window.geolocation = {
         delete this.markers[key];
       }
     });
-    
+
     // Añadir o actualizar marcadores
     users.forEach(user => {
       if (this.markers[user.username]) {
@@ -351,37 +351,37 @@ window.geolocation = {
             iconSize: [20, 20]
           })
         }).addTo(this.map);
-        
+
         marker.bindPopup(`
           <b>${escapeHtml(user.username)}</b><br>
           Última vez: ${new Date(user.updatedAt).toLocaleTimeString()}
         `);
-        
+
         this.markers[user.username] = marker;
       }
     });
   },
-  
-  findNearby: async function() {
+
+  findNearby: async function () {
     if (!this.currentPosition) {
       alert("Primero comparte tu ubicación para buscar usuarios cercanos");
       return;
     }
-    
+
     const radius = document.getElementById("radius-select").value;
     const token = localStorage.getItem("token");
-    
+
     try {
       const response = await fetch(
         `/api/messages/location/nearby?lat=${this.currentPosition.lat}&lng=${this.currentPosition.lng}&radius=${radius}`,
         { headers: { "Authorization": `Bearer ${token}` } }
       );
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         this.displayNearbyUsers(data.users);
-        
+
         // Dibujar círculo en el mapa
         if (this.circle) {
           this.map.removeLayer(this.circle);
@@ -392,7 +392,7 @@ window.geolocation = {
           fillOpacity: 0.1,
           radius: radius * 1000
         }).addTo(this.map);
-        
+
         // Centrar el mapa en la posición actual
         this.map.setView([this.currentPosition.lat, this.currentPosition.lng], 12);
       }
@@ -400,11 +400,11 @@ window.geolocation = {
       console.error("Error buscando usuarios cercanos:", err);
     }
   },
-  
-  displayNearbyUsers: function(users) {
+
+  displayNearbyUsers: function (users) {
     const container = document.getElementById("nearby-results");
     if (!container) return;
-    
+
     // Eliminar duplicados por username
     const uniqueUsers = [];
     const seen = new Set();
@@ -414,12 +414,12 @@ window.geolocation = {
         uniqueUsers.push(user);
       }
     }
-    
+
     if (uniqueUsers.length === 0) {
       container.innerHTML = `<p class="text-sm text-gray-500 text-center">📡 No hay usuarios cercanos en este radio</p>`;
       return;
     }
-    
+
     container.innerHTML = `
       <p class="text-xs font-semibold text-gray-600 mb-2">👥 Usuarios cercanos (${uniqueUsers.length})</p>
       <div class="space-y-1">

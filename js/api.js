@@ -7,7 +7,7 @@ const getApiUrl = () => {
 
 const API_URL = getApiUrl();
 
-console.log('API_URL:', API_URL); // Para debug
+console.log('API_URL:', API_URL);
 
 window.api = {
   login: async (username, password) => {
@@ -40,7 +40,7 @@ window.api = {
     const data = await res.json();
     return { ok: res.ok, data };
   },
-  
+
   getAllUsers: async (token) => {
     const res = await fetch(`${API_URL}/messages/users`, {
       method: "GET",
@@ -87,7 +87,7 @@ window.api = {
     return { ok: res.ok, data };
   },
 
-  // Editar mensaje global
+  // Editar mensaje global - En desuso, se cambió a WebSocket
   editMessage: async (token, messageId, newText) => {
     const res = await fetch(`${API_URL}/messages/edit-message/${messageId}`, {
       method: "PUT",

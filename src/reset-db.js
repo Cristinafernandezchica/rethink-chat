@@ -9,7 +9,7 @@ const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
 
 async function resetDatabase() {
-  console.log("\n========================================");
+  console.log("\n  ========================================");
   console.log("   REINICIANDO BASE DE DATOS");
   console.log("   ========================================\n");
 
@@ -21,7 +21,7 @@ async function resetDatabase() {
   try {
     // 1. ELIMINAR BASE DE DATOS SI EXISTE
     const dbList = await r.dbList().run(conn);
-    
+
     if (dbList.includes(DB_NAME)) {
       console.log(`🗑️ Eliminando base de datos: ${DB_NAME}`);
       await r.dbDrop(DB_NAME).run(conn);
@@ -47,35 +47,35 @@ async function resetDatabase() {
 
     // 4. CREAR ÍNDICES
     console.log("🔍 Creando índices...");
-    
+
     // Índices para messages
     await r.db(DB_NAME).table("messages").indexCreate("createdAt").run(conn);
     await r.db(DB_NAME).table("messages").indexCreate("search", r.row("text"), { multi: true }).run(conn);
     console.log("  ✅ Índices en 'messages'");
-    
+
     // Índices para users
     await r.db(DB_NAME).table("users").indexCreate("username").run(conn);
     console.log("  ✅ Índice en 'users'");
-    
+
     // Índices para online_users
     await r.db(DB_NAME).table("online_users").indexCreate("username").run(conn);
     console.log("  ✅ Índice en 'online_users'");
-    
+
     // Índices para private_messages
     await r.db(DB_NAME).table("private_messages").indexCreate("createdAt").run(conn);
     await r.db(DB_NAME).table("private_messages").indexCreate("conversation", [r.row("from"), r.row("to")]).run(conn);
     console.log("  ✅ Índices en 'private_messages'");
-    
+
     // Índices para alerts
     await r.db(DB_NAME).table("alerts").indexCreate("createdAt").run(conn);
     console.log("  ✅ Índice en 'alerts'");
-    
+
     // ÍNDICES GEOESPACIALES para user_locations
     await r.db(DB_NAME).table("user_locations").indexCreate("location", { geo: true }).run(conn);
     await r.db(DB_NAME).table("user_locations").indexCreate("username").run(conn);
     await r.db(DB_NAME).table("user_locations").indexCreate("updatedAt").run(conn);
     console.log("  ✅ Índices geoespaciales en 'user_locations'");
-    
+
     // Esperar índices
     await Promise.all([
       r.db(DB_NAME).table("messages").indexWait().run(conn),
@@ -92,7 +92,7 @@ async function resetDatabase() {
     
     const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
     const adminId = r.uuid();
-    
+
     await r.db(DB_NAME).table("users").insert({
       id: adminId,
       username: ADMIN_USERNAME,
@@ -106,7 +106,7 @@ async function resetDatabase() {
 
     // 6. CREAR MENSAJES DE EJEMPLO
     console.log("💬 Creando mensajes de ejemplo...");
-    
+
     const sampleMessages = [];
     const sampleTexts = [
       "🎉 ¡Bienvenido al chat! La base de datos ha sido reiniciada correctamente.",
@@ -116,7 +116,7 @@ async function resetDatabase() {
       "🔔 Los administradores pueden enviar alertas globales.",
       "📍 Comparte tu ubicación y usa el mapa para ver usuarios cercanos."
     ];
-    
+
     for (let i = 0; i < sampleTexts.length; i++) {
       sampleMessages.push({
         id: r.uuid(),
@@ -133,7 +133,7 @@ async function resetDatabase() {
         deletedBy: null
       });
     }
-    
+
     await r.db(DB_NAME).table("messages").insert(sampleMessages).run(conn);
     console.log(`  ✅ ${sampleMessages.length} mensajes de ejemplo creados\n`);
 
@@ -148,11 +148,11 @@ async function resetDatabase() {
     console.log(`   Usuarios: ${usersCount}`);
     console.log(`   Mensajes: ${messagesCount}`);
     console.log(`   Tablas: ${tablesList.join(", ")}`);
-    
+
     console.log("\n✨ ========================================");
     console.log("🎉 BASE DE DATOS REINICIADA CON ÉXITO");
     console.log("✨ ========================================\n");
-    
+
     console.log("📝 Credenciales de acceso:");
     console.log(`   Usuario: ${ADMIN_USERNAME}`);
     console.log(`   Contraseña: ${ADMIN_PASSWORD}\n`);

@@ -46,9 +46,9 @@ window.admin = {
       alertConfirm.addEventListener("click", () => {
         const text = alertText.value.trim();
         const type = alertModal.dataset.type;
-        
+
         if (!text) return;
-        
+
         if (window.chat?.socket) {
           if (type === "global") {
             window.chat.socket.emit("send_alert", { text, ephemeral: false });
@@ -56,7 +56,7 @@ window.admin = {
             window.chat.socket.emit("send_alert", { text, ephemeral: true });
           }
         }
-        
+
         alertModal.classList.add("hidden");
         alertText.value = "";
       });

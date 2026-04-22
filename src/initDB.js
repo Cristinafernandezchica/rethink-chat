@@ -8,17 +8,17 @@ dotenv.config();
 async function setupGeospatialTable(conn, dbName) {
   try {
     const tables = await r.db(dbName).tableList().run(conn);
-    
+
     if (!tables.includes("user_locations")) {
       await r.db(dbName).tableCreate("user_locations").run(conn);
       console.log("[INFO] Tabla 'user_locations' creada");
     } else {
       console.log("[INFO] Tabla 'user_locations' ya existe");
     }
-    
+
     // Crear índice geoespacial
     const indexes = await r.db(dbName).table("user_locations").indexList().run(conn);
-    
+
     if (!indexes.includes("location")) {
       await r.db(dbName)
         .table("user_locations")
@@ -26,7 +26,7 @@ async function setupGeospatialTable(conn, dbName) {
         .run(conn);
       console.log("[INFO] Índice geoespacial 'location' creado en user_locations");
     }
-    
+
     // Índice secundario para búsqueda por username
     if (!indexes.includes("username")) {
       await r.db(dbName)
@@ -35,10 +35,10 @@ async function setupGeospatialTable(conn, dbName) {
         .run(conn);
       console.log("[INFO] Índice 'username' creado en user_locations");
     }
-    
+
     await r.db(dbName).table("user_locations").indexWait().run(conn);
     console.log("[INFO] Índices geoespaciales listos");
-    
+
   } catch (err) {
     console.error("[ERROR] Configurando tabla geoespacial:", err.message);
   }
@@ -100,7 +100,7 @@ export async function initDatabase() {
         deletedBy: null
       })
       .run(conn);
-    
+
     if (messagesNeedUpdate.replaced > 0 || messagesNeedUpdate.unchanged > 0) {
       console.log(`[INFO] Migrados ${messagesNeedUpdate.replaced} mensajes con nuevos campos`);
     }
@@ -124,7 +124,7 @@ export async function initDatabase() {
         deletedBy: null
       })
       .run(conn);
-    
+
     if (privateNeedUpdate.replaced > 0 || privateNeedUpdate.unchanged > 0) {
       console.log(`[INFO] Migrados ${privateNeedUpdate.replaced} mensajes privados con nuevos campos`);
     }
@@ -133,22 +133,22 @@ export async function initDatabase() {
   }
 
   // --- CREAR ÍNDICES (después de que todas las tablas existen) ---
-  
+
   // Índices para tabla "messages"
   try {
     const messagesIndexes = await r.db(dbName).table("messages").indexList().run(conn);
-    
+
     if (!messagesIndexes.includes("createdAt")) {
       await r.db(dbName).table("messages").indexCreate("createdAt").run(conn);
       console.log("[INFO] Índice 'createdAt' creado en messages");
     }
-    
+
     // Índice de búsqueda de texto
     if (!messagesIndexes.includes("search")) {
       await r.db(dbName).table("messages").indexCreate("search", r.row("text"), { multi: true });
       console.log("[INFO] Índice de búsqueda 'search' creado en messages");
     }
-    
+
     await r.db(dbName).table("messages").indexWait().run(conn);
     console.log("[INFO] Índices de messages listos");
   } catch (err) {
@@ -158,12 +158,12 @@ export async function initDatabase() {
   // Índices para tabla "users"
   try {
     const usersIndexes = await r.db(dbName).table("users").indexList().run(conn);
-    
+
     if (!usersIndexes.includes("username")) {
       await r.db(dbName).table("users").indexCreate("username").run(conn);
       console.log("[INFO] Índice 'username' creado en users");
     }
-    
+
     await r.db(dbName).table("users").indexWait().run(conn);
   } catch (err) {
     console.error("[ERROR] Error creando índices en users:", err.message);
@@ -172,12 +172,12 @@ export async function initDatabase() {
   // Índices para tabla "online_users"
   try {
     const onlineIndexes = await r.db(dbName).table("online_users").indexList().run(conn);
-    
+
     if (!onlineIndexes.includes("username")) {
       await r.db(dbName).table("online_users").indexCreate("username").run(conn);
       console.log("[INFO] Índice 'username' creado en online_users");
     }
-    
+
     await r.db(dbName).table("online_users").indexWait().run(conn);
   } catch (err) {
     console.error("[ERROR] Error creando índices en online_users:", err.message);
@@ -186,18 +186,18 @@ export async function initDatabase() {
   // Índices para tabla "private_messages"
   try {
     const privateIndexes = await r.db(dbName).table("private_messages").indexList().run(conn);
-    
+
     if (!privateIndexes.includes("createdAt")) {
       await r.db(dbName).table("private_messages").indexCreate("createdAt").run(conn);
       console.log("[INFO] Índice 'createdAt' creado en private_messages");
     }
-    
+
     // Índice compuesto para búsqueda eficiente de conversaciones
     if (!privateIndexes.includes("conversation")) {
       await r.db(dbName).table("private_messages").indexCreate("conversation", [r.row("from"), r.row("to")]);
       console.log("[INFO] Índice 'conversation' creado en private_messages");
     }
-    
+
     await r.db(dbName).table("private_messages").indexWait().run(conn);
   } catch (err) {
     console.error("[ERROR] Error creando índices en private_messages:", err.message);
@@ -206,12 +206,12 @@ export async function initDatabase() {
   // Índices para tabla "user_locations" (geoespaciales ya creados en setupGeospatialTable)
   try {
     const locationIndexes = await r.db(dbName).table("user_locations").indexList().run(conn);
-    
+
     if (!locationIndexes.includes("updatedAt")) {
       await r.db(dbName).table("user_locations").indexCreate("updatedAt").run(conn);
       console.log("[INFO] Índice 'updatedAt' creado en user_locations");
     }
-    
+
     await r.db(dbName).table("user_locations").indexWait().run(conn);
   } catch (err) {
     console.error("[ERROR] Error creando índices adicionales en user_locations:", err.message);
@@ -221,17 +221,17 @@ export async function initDatabase() {
   try {
     const adminUsername = process.env.ADMIN_USERNAME || "admin";
     const adminPassword = process.env.ADMIN_PASSWORD || "admin";
-    
+
     const existingAdmin = await r.db(dbName)
       .table("users")
       .filter({ username: adminUsername })
       .run(conn);
-    
+
     const adminArray = await existingAdmin.toArray();
-    
+
     if (adminArray.length === 0) {
       const hashedPassword = await bcrypt.hash(adminPassword, 10);
-      
+
       await r.db(dbName).table("users").insert({
         username: adminUsername,
         password: hashedPassword,
@@ -239,7 +239,7 @@ export async function initDatabase() {
         createdAt: new Date(),
         isDefaultAdmin: true
       }).run(conn);
-      
+
       console.log(`[INFO] Usuario admin creado: ${adminUsername} / ${adminPassword}`);
       console.log("[INFO] CAMBIA LA CONTRASEÑA EN PRODUCCIÓN");
     } else {
@@ -252,7 +252,7 @@ export async function initDatabase() {
   // --- Crear mensajes de ejemplo si la tabla está vacía ---
   try {
     const messageCount = await r.db(dbName).table("messages").count().run(conn);
-    
+
     if (messageCount === 0) {
       console.log("[INFO] Creando mensajes de ejemplo...");
       await r.db(dbName).table("messages").insert([
